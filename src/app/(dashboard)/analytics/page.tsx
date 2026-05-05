@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getDashboardStats } from "@/features/analytics/lib/queries";
 import { PROVIDER_LABELS, PROVIDER_COLORS, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/lib/constants";
 import { calcPercentage } from "@/shared/lib/utils";

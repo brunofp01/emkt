@@ -2,6 +2,8 @@
  * Dashboard Home — Página principal com overview de métricas.
  * Renderização: SSR (dados em tempo real)
  */
+export const dynamic = "force-dynamic";
+
 import {
   Users,
   Mail,

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { getCampaigns } from "@/features/campaigns/lib/queries";
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_COLORS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";

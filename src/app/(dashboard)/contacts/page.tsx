@@ -2,6 +2,8 @@
  * Contacts Page — Lista de contatos com filtros e busca.
  * Renderização: SSR com search params.
  */
+export const dynamic = "force-dynamic";
+
 import { Suspense } from "react";
 import { getContacts } from "@/features/contacts/lib/queries";
 import { ContactTable } from "@/features/contacts/components/contact-table";
