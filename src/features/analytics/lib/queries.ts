@@ -50,6 +50,11 @@ export async function getDashboardStats() {
       provider: p.provider,
       count: p._count._all,
     })),
+    recentEvents: await prisma.emailEvent.findMany({
+      take: 10,
+      orderBy: { timestamp: "desc" },
+      include: { contact: true },
+    }),
     eventMap,
     totalEvents,
   };
