@@ -42,7 +42,7 @@ export default async function CampaignsPage() {
                 <ChevronRight className="h-5 w-5 text-surface-600 group-hover:text-primary-400 transition-colors" />
               </div>
               <div className="mt-4 flex items-center gap-3 text-xs text-surface-500">
-                <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status] ?? campaign.status} size="sm" dot />
+                <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ?? campaign.status} size="sm" dot />
                 <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{campaign.steps.length} etapas</span>
                 <span className="flex items-center gap-1"><Users className="h-3 w-3" />{campaign._count.campaignContacts} contatos</span>
               </div>
