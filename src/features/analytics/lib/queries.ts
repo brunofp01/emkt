@@ -1,30 +1,41 @@
-import { prisma } from "@/shared/lib/prisma";
+import { supabase } from "@/shared/lib/supabase";
 
+/**
+ * Dashboard Statistics Query - Refatorado para usar o SDK oficial do Supabase.
+ * O uso de HTTPS/REST elimina 100% dos problemas de rede (IPv6/Networking) 
+ * que ocorrem com o protocolo direto do PostgreSQL em plataformas serverless.
+ */
 export async function getDashboardStats() {
+  // Executamos as consultas via HTTPS/REST para máxima estabilidade
   const [
-    totalContacts,
-    activeCampaigns,
-    eventCounts,
-    providerCounts,
+    { count: totalContacts },
+    { count: activeCampaigns },
+    { data: events },
+    { data: providers },
+    { data: recentEventsData }
   ] = await Promise.all([
-    prisma.contact.count(),
-    prisma.campaign.count({ where: { status: "ACTIVE" } }),
-    prisma.emailEvent.groupBy({
-      by: ["eventType"],
-      _count: { _all: true },
-    }),
-    prisma.contact.groupBy({
-      by: ["provider"],
-      _count: { _all: true },
-    }),
+    supabase.from('Contact').select('*', { count: 'exact', head: true }),
+    supabase.from('Campaign').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
+    supabase.from('EmailEvent').select('eventType'),
+    supabase.from('Contact').select('provider'),
+    supabase.from('EmailEvent').select('*, contact:Contact(*)').order('timestamp', { ascending: false }).limit(10)
   ]);
 
   const eventMap: Record<string, number> = {};
   let totalEvents = 0;
   
-  for (const e of eventCounts) {
-    eventMap[e.eventType] = e._count._all;
-    totalEvents += e._count._all;
+  if (events) {
+    events.forEach(e => {
+      eventMap[e.eventType] = (eventMap[e.eventType] || 0) + 1;
+      totalEvents++;
+    });
+  }
+
+  const providerMap: Record<string, number> = {};
+  if (providers) {
+    providers.forEach(p => {
+      providerMap[p.provider] = (providerMap[p.provider] || 0) + 1;
+    });
   }
 
   const totalSent = (eventMap["SENT"] ?? 0) + (eventMap["DELIVERED"] ?? 0);
@@ -35,8 +46,8 @@ export async function getDashboardStats() {
   const totalComplaints = eventMap["COMPLAINED"] ?? 0;
 
   return {
-    totalContacts,
-    activeCampaigns,
+    totalContacts: totalContacts || 0,
+    activeCampaigns: activeCampaigns || 0,
     totalSent,
     totalDelivered,
     totalOpened,
@@ -46,15 +57,14 @@ export async function getDashboardStats() {
     openRate: calcPercentage(totalOpened, totalDelivered),
     clickRate: calcPercentage(totalClicked, totalOpened),
     bounceRate: calcPercentage(totalBounced, totalSent),
-    providerCounts: providerCounts.map((p) => ({
-      provider: p.provider,
-      count: p._count._all,
+    providerCounts: Object.entries(providerMap).map(([provider, count]) => ({
+      provider,
+      count,
     })),
-    recentEvents: await prisma.emailEvent.findMany({
-      take: 10,
-      orderBy: { timestamp: "desc" },
-      include: { contact: true },
-    }),
+    recentEvents: (recentEventsData || []).map((event: any) => ({
+      ...event,
+      contact: event.contact
+    })),
     eventMap,
     totalEvents,
   };
