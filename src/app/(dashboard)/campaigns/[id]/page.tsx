@@ -62,6 +62,8 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       stepId: step.id,
       stepOrder: step.stepOrder,
       subject: step.subject,
+      subjectB: step.subjectB,
+      isABTest: step.isABTest,
       delayHours: step.delayHours,
       sent: isFirstStep ? sentCount : atThisStep,
       delivered: isFirstStep ? deliveredCount : Math.floor(atThisStep * 0.95),
@@ -167,8 +169,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                     {metric.stepOrder}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-surface-200 truncate">{metric.subject || "(Sem Assunto)"}</h3>
-                    {idx > 0 && <p className="text-[10px] text-surface-600">Delay: {metric.delayHours}h após abertura</p>}
+                    {metric.isABTest ? (
+                      <div className="space-y-1">
+                        <h3 className="text-[11px] font-bold text-surface-300 truncate uppercase tracking-widest"><span className="text-primary-500">Var A:</span> {metric.subject || "(Sem Assunto)"}</h3>
+                        <h3 className="text-[11px] font-bold text-surface-300 truncate uppercase tracking-widest"><span className="text-emerald-500">Var B:</span> {metric.subjectB || "(Sem Assunto)"}</h3>
+                      </div>
+                    ) : (
+                      <h3 className="text-sm font-bold text-surface-200 truncate">{metric.subject || "(Sem Assunto)"}</h3>
+                    )}
+                    {idx > 0 && <p className="text-[10px] text-surface-600 mt-1">Delay: {metric.delayHours}h após abertura</p>}
                   </div>
                 </div>
 
