@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PROVIDER_LABELS, PROVIDER_COLORS, STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
-import { Tag, Building2, User, ChevronRight, Activity, Calendar } from "lucide-react";
+import { Tag, Building2, User, ChevronRight, Activity, Calendar, MoreHorizontal } from "lucide-react";
 
 interface ContactTableRowProps {
   contact: {
