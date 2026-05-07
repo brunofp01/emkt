@@ -4,9 +4,10 @@
  * Docs: https://resend.com/docs
  */
 import { Resend } from "resend";
+import { env } from "@/shared/lib/env";
 import type { EmailProviderAdapter, SendEmailParams, SendEmailResult } from "@/shared/types";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy");
+const resend = new Resend(env.RESEND_API_KEY || "re_dummy");
 
 export const resendProvider: EmailProviderAdapter = {
   name: "RESEND",

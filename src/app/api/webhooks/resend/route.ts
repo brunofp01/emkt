@@ -5,9 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
+import { env } from "@/shared/lib/env";
 import type { EmailEventType } from "@prisma/client";
 
-const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET!;
+const RESEND_WEBHOOK_SECRET = env.RESEND_WEBHOOK_SECRET || "";
 
 const eventMap: Record<string, EmailEventType> = {
   "email.sent": "SENT",

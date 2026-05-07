@@ -7,9 +7,10 @@ import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
 import { rewriteLinks } from "@/features/email/lib/link-tracker";
+import { env } from "@/shared/lib/env";
 import { logger } from "@/shared/lib/logger";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mktemail.vercel.app';
+const BASE_URL = env.NEXT_PUBLIC_APP_URL;
 
 export const sendEmail = inngest.createFunction(
   {
