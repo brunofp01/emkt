@@ -116,21 +116,66 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 }
 
 /**
- * Ativa uma campanha.
+ * Ativa uma campanha e dispara o início para todos os contatos pendentes.
  */
 export async function activateCampaign(campaignId: string): Promise<CampaignActionState> {
   try {
-    const { error } = await supabase
+    // 1. Atualizar status da campanha
+    const { error: updateError } = await supabase
       .from('Campaign')
       .update({ status: 'ACTIVE', updatedAt: new Date().toISOString() })
       .eq('id', campaignId);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
+
+    // 2. Buscar todos os contatos que estão aguardando (QUEUED ou PENDING)
+    const { data: contacts, error: contactsError } = await supabase
+      .from('CampaignContact')
+      .select('id, contactId, currentStepId, contact:Contact(email)')
+      .eq('campaignId', campaignId)
+      .in('stepStatus', ['QUEUED', 'PENDING']);
+
+    if (contactsError) throw contactsError;
+
+    // 3. Buscar a primeira etapa da campanha
+    const { data: steps } = await supabase
+      .from('CampaignStep')
+      .select('*')
+      .eq('campaignId', campaignId)
+      .order('stepOrder', { ascending: true })
+      .limit(1);
+
+    const firstStep = steps?.[0];
+
+    if (contacts && firstStep) {
+      console.log(`[Diagnostic] Ativando ${contacts.length} contatos para a campanha ${campaignId}`);
+      
+      for (const cc of contacts) {
+        // Enviar evento de disparo para o Inngest
+        await inngest.send({
+          name: "email/send",
+          data: {
+            contactId: cc.contactId,
+            campaignContactId: cc.id,
+            subject: firstStep.subject,
+            htmlBody: firstStep.htmlBody,
+            textBody: firstStep.textBody,
+          },
+        });
+
+        // Atualizar status para QUEUED (já está na fila do Inngest)
+        await supabase
+          .from('CampaignContact')
+          .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
+          .eq('id', cc.id);
+      }
+    }
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);
     return { success: true };
   } catch (err) {
+    console.error('[Diagnostic] Erro ao ativar campanha:', err);
     return { error: err instanceof Error ? err.message : "Erro ao ativar." };
   }
 }
@@ -157,24 +202,26 @@ export async function pauseCampaign(campaignId: string): Promise<CampaignActionS
 
 
 /**
- * Adiciona contatos e inicia o fluxo.
+ * Adiciona contatos e inicia o fluxo se a campanha estiver ativa.
  */
 export async function addContactsToCampaign(campaignId: string, contactIds: string[]): Promise<CampaignActionState> {
   try {
-    // Buscar primeira etapa
-    const { data: steps, error: stepsError } = await supabase
-      .from('CampaignStep')
-      .select('id, subject, htmlBody, textBody')
-      .eq('campaignId', campaignId)
-      .order('stepOrder', { ascending: true })
-      .limit(1);
+    // 1. Buscar status da campanha e primeira etapa
+    const [{ data: campaign }, { data: steps }] = await Promise.all([
+      supabase.from('Campaign').select('status').eq('id', campaignId).single(),
+      supabase.from('CampaignStep').select('*').eq('campaignId', campaignId).order('stepOrder', { ascending: true }).limit(1)
+    ]);
 
-    if (stepsError || !steps?.[0]) return { error: "Campanha sem etapas." };
+    if (!campaign) return { error: "Campanha não encontrada." };
+    if (!steps?.[0]) return { error: "Campanha sem etapas." };
+    
     const firstStep = steps[0];
+    const isCampaignActive = campaign.status === 'ACTIVE';
 
     for (const contactId of contactIds) {
       const contactCampaignId = generateId();
       
+      // Criar o vínculo
       const { data: cc, error: ccError } = await supabase
         .from('CampaignContact')
         .upsert({
@@ -182,24 +229,30 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
           contactId,
           campaignId,
           currentStepId: firstStep.id,
-          stepStatus: 'QUEUED',
+          stepStatus: isCampaignActive ? 'QUEUED' : 'PENDING',
           updatedAt: new Date().toISOString(),
         }, { onConflict: 'contactId,campaignId' })
         .select()
         .single();
 
-      if (ccError) continue;
+      if (ccError) {
+        console.error('[Diagnostic] Erro ao vincular contato:', ccError);
+        continue;
+      }
 
-      await inngest.send({
-        name: "email/send",
-        data: {
-          contactId,
-          campaignContactId: cc.id,
-          subject: firstStep.subject,
-          htmlBody: firstStep.htmlBody,
-          textBody: firstStep.textBody,
-        },
-      });
+      // Só envia para o Inngest IMEDIATAMENTE se a campanha estiver ATIVA
+      if (isCampaignActive) {
+        await inngest.send({
+          name: "email/send",
+          data: {
+            contactId,
+            campaignContactId: cc.id,
+            subject: firstStep.subject,
+            htmlBody: firstStep.htmlBody,
+            textBody: firstStep.textBody,
+          },
+        });
+      }
     }
 
     revalidatePath(`/campaigns/${campaignId}`);
