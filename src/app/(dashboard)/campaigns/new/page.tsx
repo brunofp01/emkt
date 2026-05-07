@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createCampaign, type CampaignActionState } from "@/features/campaigns/actions/create-campaign";
 import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info } from "lucide-react";
 import Link from "next/link";
-import { EmailVisualEditor } from "@/features/campaigns/components/email-visual-editor";
+import { EmailCodeEditor } from "@/features/campaigns/components/email-code-editor";
 
 interface StepData {
   stepOrder: number;
@@ -59,14 +59,14 @@ export default function NewCampaignPage() {
     setSteps((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
 
-  const handleSaveDesign = (html: string, design: any) => {
+  const handleSaveDesign = (html: string) => {
     if (editingStepIndex !== null) {
       if (editingVariant === "A") {
         updateStep(editingStepIndex, "htmlBody", html);
-        updateStep(editingStepIndex, "design", design);
+        updateStep(editingStepIndex, "design", { isCode: true }); // Marcador de design concluído
       } else {
         updateStep(editingStepIndex, "htmlBodyB", html);
-        updateStep(editingStepIndex, "designB", design);
+        updateStep(editingStepIndex, "designB", { isCode: true });
       }
       setEditingStepIndex(null);
     }
@@ -79,13 +79,9 @@ export default function NewCampaignPage() {
     const currentStep = steps[editingStepIndex];
     return (
       <div className="fixed inset-0 z-50 bg-surface-950 p-4 md:p-8 animate-in fade-in zoom-in duration-300">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-surface-50">
-            Editando Design: {editingVariant === "A" ? "Versão A" : "Versão B"} (Etapa {currentStep.stepOrder})
-          </h2>
-        </div>
-        <EmailVisualEditor
-          initialDesign={editingVariant === "A" ? currentStep.design : currentStep.designB}
+        <EmailCodeEditor
+          initialHtml={editingVariant === "A" ? currentStep.htmlBody : currentStep.htmlBodyB}
+          subject={editingVariant === "A" ? currentStep.subject : currentStep.subjectB}
           onSave={handleSaveDesign}
           onCancel={() => setEditingStepIndex(null)}
         />
