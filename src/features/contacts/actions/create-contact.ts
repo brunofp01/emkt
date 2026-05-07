@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabase } from "@/shared/lib/supabase";
 import { selectProviderForNewContact } from "@/features/email/lib/provider-selector";
+import { addContactsToCampaign } from "@/features/campaigns/actions/create-campaign";
 
 /** Schema de validação para criação de contato */
 const createContactSchema = z.object({
@@ -15,6 +16,7 @@ const createContactSchema = z.object({
   company: z.string().optional(),
   phone: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  campaignId: z.string().optional().nullable(),
 });
 
 /** Schema de validação para atualização de contato */
@@ -46,6 +48,7 @@ export async function createContact(
       name: (formData.get("name") as string) || undefined,
       company: (formData.get("company") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
+      campaignId: (formData.get("campaignId") as string) || undefined,
       tags: formData.get("tags")
         ? (formData.get("tags") as string).split(",").map((t) => t.trim()).filter(Boolean)
         : undefined,
@@ -61,33 +64,43 @@ export async function createContact(
       .eq('email', validated.email)
       .single();
 
-    if (existing) {
-      return { error: "Este email já está cadastrado." };
+    let contactId = existing?.id;
+
+    if (!existing) {
+      // 3. Selecionar provedor
+      const selectedProvider = await selectProviderForNewContact();
+
+      // 4. Criar contato via HTTPS
+      const { data: contact, error } = await supabase
+        .from('Contact')
+        .insert({
+          email: validated.email,
+          name: validated.name,
+          company: validated.company,
+          phone: validated.phone,
+          tags: validated.tags ?? [],
+          provider: selectedProvider,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      contactId = contact.id;
     }
 
-    // 3. Selecionar provedor
-    const selectedProvider = await selectProviderForNewContact();
-
-    // 4. Criar contato via HTTPS
-    const { data: contact, error } = await supabase
-      .from('Contact')
-      .insert({
-        email: validated.email,
-        name: validated.name,
-        company: validated.company,
-        phone: validated.phone,
-        tags: validated.tags ?? [],
-        provider: selectedProvider,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+    // 5. Se houver campanha selecionada, adicionar à campanha
+    if (validated.campaignId && contactId) {
+      const result = await addContactsToCampaign(validated.campaignId, [contactId]);
+      if (result.error) {
+        console.error('Erro ao adicionar à campanha:', result.error);
+        // Não falhamos a criação do contato por causa disso, mas reportamos no console
+      }
+    }
 
     revalidatePath("/contacts");
     revalidatePath("/");
 
-    return { success: true, contactId: contact.id };
+    return { success: true, contactId };
   } catch (err) {
     console.error('Action error (createContact):', err);
     if (err instanceof z.ZodError) {

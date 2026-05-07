@@ -1,57 +1,135 @@
 "use client";
 
 import { useActionState } from "react";
-import { X, Loader2, UserPlus } from "lucide-react";
+import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity } from "lucide-react";
 import { createContact, type CreateContactState } from "@/features/contacts/actions/create-contact";
 
 interface ContactFormProps {
+  campaigns: Array<{ id: string; name: string }>;
   onClose: () => void;
 }
 
-export function ContactForm({ onClose }: ContactFormProps) {
+export function ContactForm({ onClose, campaigns }: ContactFormProps) {
   const [state, formAction, isPending] = useActionState<CreateContactState, FormData>(
     createContact,
     {}
   );
 
   if (state.success) {
-    setTimeout(onClose, 300);
+    setTimeout(onClose, 500);
   }
 
-  const inputClass = "h-10 w-full rounded-lg border border-surface-800 bg-surface-900/50 px-4 text-sm text-surface-200 placeholder:text-surface-600 transition-colors focus:border-primary-500/50 focus:outline-none focus:ring-1 focus:ring-primary-500/20";
-  const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wider text-surface-400";
+  const inputClass = "h-11 w-full rounded-xl border border-surface-800 bg-surface-900/50 pl-11 pr-4 text-sm text-surface-200 placeholder:text-surface-600 transition-all focus:border-primary-500/50 focus:outline-none focus:ring-4 focus:ring-primary-500/5";
+  const labelClass = "mb-1.5 block text-[10px] font-black uppercase tracking-widest text-surface-500 ml-1";
+  const iconClass = "absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-600 group-focus-within:text-primary-500 transition-colors";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-md animate-fade-in p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700">
-              <UserPlus className="h-5 w-5 text-white" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="glass-card w-full max-w-lg animate-in fade-in zoom-in duration-200 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-surface-800/60 px-6 py-5 bg-surface-900/20">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-500 border border-primary-500/20">
+              <UserPlus className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-surface-50">Novo Contato</h2>
-              <p className="text-xs text-surface-500">Provedor atribuído automaticamente</p>
+              <h2 className="text-lg font-bold text-surface-50">Novo Contato</h2>
+              <p className="text-xs text-surface-500 font-medium">Cadastre um lead manualmente</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-surface-500 hover:bg-surface-800 hover:text-surface-300">
+          <button onClick={onClose} className="rounded-xl p-2 text-surface-500 hover:bg-surface-800 hover:text-surface-300 transition-all">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {state.error && <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{state.error}</div>}
-        {state.success && <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">✓ Contato criado!</div>}
+        <div className="p-8">
+          {state.error && (
+            <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+              {state.error}
+            </div>
+          )}
+          
+          {state.success && (
+            <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-400 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              Contato cadastrado com sucesso!
+            </div>
+          )}
 
-        <form action={formAction} className="space-y-4">
-          <div><label htmlFor="contact-email" className={labelClass}>Email *</label><input id="contact-email" name="email" type="email" required placeholder="contato@empresa.com" className={inputClass} /></div>
-          <div><label htmlFor="contact-name" className={labelClass}>Nome</label><input id="contact-name" name="name" type="text" placeholder="João Silva" className={inputClass} /></div>
-          <div><label htmlFor="contact-company" className={labelClass}>Empresa</label><input id="contact-company" name="company" type="text" placeholder="Empresa Ltda" className={inputClass} /></div>
-          <div><label htmlFor="contact-phone" className={labelClass}>Telefone</label><input id="contact-phone" name="phone" type="tel" placeholder="(11) 99999-9999" className={inputClass} /></div>
-          <div><label htmlFor="contact-tags" className={labelClass}>Tags (vírgula)</label><input id="contact-tags" name="tags" type="text" placeholder="lead, marketing" className={inputClass} /></div>
-          <button type="submit" disabled={isPending} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary-600 font-medium text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] disabled:opacity-50">
-            {isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Criando...</> : <><UserPlus className="h-4 w-4" />Criar Contato</>}
-          </button>
-        </form>
+          <form action={formAction} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="md:col-span-2">
+                <label htmlFor="contact-email" className={labelClass}>Email Principal *</label>
+                <div className="relative group">
+                  <Mail className={iconClass} />
+                  <input id="contact-email" name="email" type="email" required placeholder="ex: joao@empresa.com" className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact-name" className={labelClass}>Nome Completo</label>
+                <div className="relative group">
+                  <User className={iconClass} />
+                  <input id="contact-name" name="name" type="text" placeholder="ex: João Silva" className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact-phone" className={labelClass}>Telefone / WhatsApp</label>
+                <div className="relative group">
+                  <Phone className={iconClass} />
+                  <input id="contact-phone" name="phone" type="tel" placeholder="ex: (11) 99999-9999" className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact-company" className={labelClass}>Empresa</label>
+                <div className="relative group">
+                  <Building2 className={iconClass} />
+                  <input id="contact-company" name="company" type="text" placeholder="ex: Tech Solutions" className={inputClass} />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact-tags" className={labelClass}>Tags (separadas por vírgula)</label>
+                <div className="relative group">
+                  <Tag className={iconClass} />
+                  <input id="contact-tags" name="tags" type="text" placeholder="ex: lead, vip, 2024" className={inputClass} />
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label htmlFor="contact-campaign" className={labelClass}>Adicionar à Campanha</label>
+                <div className="relative group">
+                  <Activity className={iconClass} />
+                  <select id="contact-campaign" name="campaignId" className={inputClass}>
+                    <option value="">Nenhuma campanha (Apenas cadastrar)</option>
+                    {campaigns.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mt-1.5 text-[10px] text-surface-500 italic ml-1">
+                  Se selecionado, o contato iniciará o fluxo de emails automaticamente.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <button 
+                type="submit" 
+                disabled={isPending} 
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-primary-600 font-bold text-white shadow-xl shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] disabled:opacity-50 transition-all"
+              >
+                {isPending ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" /> Processando...</>
+                ) : (
+                  <><UserPlus className="h-5 w-5" /> Confirmar Cadastro</>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -2,8 +2,8 @@
  * Contact queries — Busca de contatos usando o SDK oficial do Supabase.
  * Refatorado para máxima estabilidade e Segmentação Dinâmica (Fase 6).
  */
-import { supabase } from "@/shared/lib/supabase";
-import type { EmailProvider, ContactStatus } from "@prisma/client";
+import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
+import type { EmailProvider, ContactStatus } from "@/shared/types";
 
 export interface ContactFilters {
   search?: string;
