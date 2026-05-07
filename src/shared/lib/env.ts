@@ -17,7 +17,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
-export const env = envSchema.parse({
+const parsed = envSchema.safeParse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -28,6 +28,13 @@ export const env = envSchema.parse({
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NODE_ENV: process.env.NODE_ENV,
 });
+
+if (!parsed.success) {
+  console.error("❌ Invalid environment variables:", parsed.error.flatten().fieldErrors);
+  // Não lançamos erro aqui para não derrubar a aplicação inteira em produção
+}
+
+export const env = parsed.success ? parsed.data : ({} as z.infer<typeof envSchema>);
 
 /**
  * Helper para verificar se temos algum provedor configurado.
