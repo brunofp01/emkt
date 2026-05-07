@@ -1,8 +1,3 @@
-// =============================================================
-// Email Marketing Platform — Prisma Schema
-// Database: PostgreSQL (Supabase)
-// =============================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,9 +8,133 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// =============================================================
-// ENUMS
-// =============================================================
+/// Contato (destinatário de email).
+/// O campo `provider` é atribuído permanentemente no momento do cadastro.
+model Contact {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  name             String?
+  company          String?
+  phone            String?
+  tags             String[]          @default([])
+  provider         EmailProvider
+  status           ContactStatus     @default(ACTIVE)
+  metadata         Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  campaignContacts CampaignContact[]
+  emailEvents      EmailEvent[]
+
+  @@index([provider])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Campanha de email marketing (régua de prospecção).
+model Campaign {
+  id               String            @id @default(cuid())
+  name             String
+  description      String?
+  status           CampaignStatus    @default(DRAFT)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  campaignContacts CampaignContact[]
+  steps            CampaignStep[]
+
+  @@index([status])
+}
+
+/// Etapa da sequência de uma campanha.
+/// Define o assunto e corpo de cada email na régua.
+model CampaignStep {
+  id               String            @id @default(cuid())
+  campaignId       String
+  stepOrder        Int
+  subject          String
+  htmlBody         String
+  textBody         String?
+  delayHours       Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  design           Json?
+  conditions       Json?
+  designB          Json?
+  htmlBodyB        String?
+  isABTest         Boolean           @default(false)
+  subjectB         String?
+  campaignContacts CampaignContact[]
+  campaign         Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, stepOrder])
+  @@index([campaignId])
+}
+
+/// Vínculo contato ↔ campanha — máquina de estados da régua.
+/// Rastreia em qual etapa cada contato se encontra dentro de uma campanha.
+model CampaignContact {
+  id            String             @id @default(cuid())
+  contactId     String
+  campaignId    String
+  currentStepId String?
+  stepStatus    SequenceStepStatus @default(PENDING)
+  isPaused      Boolean            @default(false)
+  lastMessageId String?
+  lastSentAt    DateTime?
+  lastOpenedAt  DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  abVariant     String?
+  campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact       Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  currentStep   CampaignStep?      @relation(fields: [currentStepId], references: [id])
+
+  @@unique([contactId, campaignId])
+  @@index([campaignId, stepStatus])
+  @@index([contactId])
+}
+
+/// Evento de email recebido via webhook.
+/// Armazena todos os eventos (sent, delivered, opened, clicked, bounced, etc.)
+/// com dados enriquecidos (IP, user agent, geolocalização).
+model EmailEvent {
+  id           String         @id @default(cuid())
+  contactId    String
+  externalId   String         @unique
+  messageId    String
+  provider     EmailProvider
+  eventType    EmailEventType
+  ip           String?
+  userAgent    String?
+  country      String?
+  city         String?
+  clickedUrl   String?
+  bounceReason String?
+  rawPayload   Json?
+  timestamp    DateTime
+  createdAt    DateTime       @default(now())
+  contact      Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, timestamp])
+  @@index([messageId])
+  @@index([provider, eventType])
+  @@index([timestamp])
+}
+
+/// Configuração dos provedores de email.
+/// Controla pesos de distribuição, limites e status de cada provedor.
+model ProviderConfig {
+  id          String        @id @default(cuid())
+  provider    EmailProvider @unique
+  weight      Int           @default(25)
+  dailyLimit  Int           @default(100)
+  sentToday   Int           @default(0)
+  isActive    Boolean       @default(true)
+  fromEmail   String
+  fromName    String
+  lastResetAt DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
 
 enum EmailProvider {
   RESEND
@@ -62,150 +181,4 @@ enum EmailEventType {
   UNSUBSCRIBED
   FAILED
   REJECTED
-}
-
-// =============================================================
-// MODELS
-// =============================================================
-
-/// Contato (destinatário de email).
-/// O campo `provider` é atribuído permanentemente no momento do cadastro.
-model Contact {
-  id       String        @id @default(cuid())
-  email    String        @unique
-  name     String?
-  company  String?
-  phone    String?
-  tags     String[]      @default([])
-  provider EmailProvider
-  status   ContactStatus @default(ACTIVE)
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  campaignContacts CampaignContact[]
-  emailEvents      EmailEvent[]
-
-  @@index([provider])
-  @@index([status])
-  @@index([createdAt])
-}
-
-/// Campanha de email marketing (régua de prospecção).
-model Campaign {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
-  status      CampaignStatus @default(DRAFT)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  steps            CampaignStep[]
-  campaignContacts CampaignContact[]
-
-  @@index([status])
-}
-
-/// Etapa da sequência de uma campanha.
-/// Define o assunto e corpo de cada email na régua.
-model CampaignStep {
-  id         String @id @default(cuid())
-  campaignId String
-  stepOrder  Int
-  subject    String
-  htmlBody   String @db.Text
-  textBody   String? @db.Text
-  design     Json?
-
-  // A/B Testing Fields
-  isABTest   Boolean @default(false)
-  subjectB   String?
-  htmlBodyB  String? @db.Text
-  designB    Json?
-
-  conditions Json?
-  delayHours Int    @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  campaign         Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  campaignContacts CampaignContact[]
-
-  @@unique([campaignId, stepOrder])
-  @@index([campaignId])
-}
-
-/// Vínculo contato ↔ campanha — máquina de estados da régua.
-/// Rastreia em qual etapa cada contato se encontra dentro de uma campanha.
-model CampaignContact {
-  id            String             @id @default(cuid())
-  contactId     String
-  campaignId    String
-  currentStepId String?
-  stepStatus    SequenceStepStatus @default(PENDING)
-  abVariant     String?            // "A" ou "B"
-  isPaused      Boolean            @default(false)
-  lastMessageId String?
-  lastSentAt    DateTime?
-  lastOpenedAt  DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  contact     Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  currentStep CampaignStep? @relation(fields: [currentStepId], references: [id])
-
-  @@unique([contactId, campaignId])
-  @@index([campaignId, stepStatus])
-  @@index([contactId])
-}
-
-/// Evento de email recebido via webhook.
-/// Armazena todos os eventos (sent, delivered, opened, clicked, bounced, etc.)
-/// com dados enriquecidos (IP, user agent, geolocalização).
-model EmailEvent {
-  id           String         @id @default(cuid())
-  contactId    String
-  externalId   String         @unique
-  messageId    String
-  provider     EmailProvider
-  eventType    EmailEventType
-  ip           String?
-  userAgent    String?
-  country      String?
-  city         String?
-  clickedUrl   String?
-  bounceReason String?
-  rawPayload   Json?
-  timestamp    DateTime
-
-  createdAt DateTime @default(now())
-
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  @@index([contactId, timestamp])
-  @@index([messageId])
-  @@index([provider, eventType])
-  @@index([timestamp])
-}
-
-/// Configuração dos provedores de email.
-/// Controla pesos de distribuição, limites e status de cada provedor.
-model ProviderConfig {
-  id          String        @id @default(cuid())
-  provider    EmailProvider @unique
-  weight      Int           @default(25)
-  dailyLimit  Int           @default(100)
-  sentToday   Int           @default(0)
-  isActive    Boolean       @default(true)
-  fromEmail   String
-  fromName    String
-  lastResetAt DateTime      @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }

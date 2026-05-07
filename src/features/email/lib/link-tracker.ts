@@ -42,5 +42,9 @@ export function rewriteLinks({ html, campaignContactId, baseUrl }: RewriteLinksO
     $(element).attr('href', trackingUrl);
   });
 
+  // Injetar Pixel de Abertura (Tracking Pixel)
+  const openTrackingPixel = `<img src="${baseUrl}/api/tracking/open?ccid=${campaignContactId}" width="1" height="1" style="display:none !important;" />`;
+  $('body').append(openTrackingPixel);
+
   return $.html();
 }

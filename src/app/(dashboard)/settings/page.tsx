@@ -1,4 +1,5 @@
 import { Settings, Shield, Bell, Database, Mail } from "lucide-react";
+import { SetupProvidersButton } from "@/features/email/components/setup-providers-button";
 
 export default function SettingsPage() {
   return (
@@ -16,7 +17,7 @@ export default function SettingsPage() {
           </div>
           <p className="text-sm text-surface-400">Configure suas chaves de API do Resend, Brevo ou Mailgun.</p>
           <div className="pt-2">
-            <button className="text-sm font-medium text-primary-400 hover:text-primary-300">Configurar Conexões →</button>
+            <SetupProvidersButton />
           </div>
         </div>
 
