@@ -13,6 +13,7 @@ interface StepData {
   htmlBody: string;
   textBody: string;
   design: any;
+  conditions: any;
   delayHours: number;
 }
 
@@ -171,6 +172,33 @@ export default function NewCampaignPage() {
                       onChange={(e) => updateStep(idx, "delayHours", parseInt(e.target.value) || 0)} 
                       className={`${inputClass} disabled:opacity-30`} 
                     />
+                  </div>
+                </div>
+
+                {/* Intelligent Branching Logic */}
+                <div className="rounded-xl bg-surface-900/50 border border-surface-800 p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary-400" />
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-surface-400">Lógica de Automação</h3>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-surface-300">
+                    <span>Se o contato</span>
+                    <div className="px-3 py-1 bg-surface-800 rounded border border-surface-700 text-primary-400 font-bold text-xs uppercase">Clicar em um link</div>
+                    <span>pular para a etapa</span>
+                    <select
+                      value={step.conditions?.[0]?.nextStepOrder || ""}
+                      onChange={(e) => {
+                        const nextOrder = parseInt(e.target.value);
+                        const newConditions: any[] | null = nextOrder ? [{ on: "CLICKED", nextStepOrder: nextOrder }] : null;
+                        updateStep(idx, "conditions", newConditions);
+                      }}
+                      className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:outline-none focus:border-primary-500"
+                    >
+                      <option value="">Próxima Etapa (Padrão)</option>
+                      {steps.map((_, sIdx) => sIdx + 1 > step.stepOrder && (
+                        <option key={sIdx} value={sIdx + 1}>Etapa {sIdx + 1}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
