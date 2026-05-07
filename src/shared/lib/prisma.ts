@@ -13,9 +13,10 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query"] : [],
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
+// Garante que o Prisma não mantenha conexões abertas desnecessariamente em Serverless
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
