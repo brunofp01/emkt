@@ -17,6 +17,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   
   if (!campaign) notFound();
 
+  const steps = campaign.steps || [];
+  const contacts = campaign.campaignContacts || [];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
@@ -28,14 +31,19 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           <div>
             <h1 className="text-2xl font-bold text-surface-50">{campaign.name}</h1>
             {campaign.description && <p className="mt-1 text-sm text-surface-400">{campaign.description}</p>}
-            <div className="mt-4 flex items-center gap-4 text-sm text-surface-500">
-              <span className="flex items-center gap-1"><Mail className="h-4 w-4" /> {campaign.steps.length} emails</span>
-              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {campaign.campaignContacts.length} contatos</span>
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-surface-500">
+              <span className="flex items-center gap-1"><Mail className="h-4 w-4" /> {steps.length} emails</span>
+              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {contacts.length} contatos</span>
               <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> Criada em {formatDate(campaign.createdAt)}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS]} size="md" dot />
+            <StatusBadge 
+              status={campaign.status || "DRAFT"} 
+              label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] || campaign.status} 
+              size="md" 
+              dot 
+            />
             {campaign.status === "DRAFT" && (
               <form action={async () => {
                 "use server";
@@ -64,13 +72,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-surface-400">Sequência</h2>
           <div className="relative space-y-0 pl-4">
             <div className="absolute left-[27px] top-4 h-[calc(100%-2rem)] w-px bg-surface-800" />
-            {(campaign.steps || []).map((step: any, idx: number) => (
-              <div key={step.id} className="relative flex gap-4 py-3">
+            {steps.map((step: any, idx: number) => (
+              <div key={step.id || idx} className="relative flex gap-4 py-3">
                 <div className="relative z-10 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary-900 border-4 border-surface-950 text-xs font-bold text-primary-400">
                   {step.stepOrder}
                 </div>
                 <div className="flex-1 rounded-lg border border-surface-800/50 bg-surface-900/30 p-3">
-                  <h3 className="font-medium text-surface-200">{step.subject}</h3>
+                  <h3 className="font-medium text-surface-200">{step.subject || "(Sem Assunto)"}</h3>
                   {idx > 0 && <p className="mt-1 text-xs text-surface-500">Delay: {step.delayHours}h após abertura</p>}
                 </div>
               </div>
@@ -98,20 +106,20 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-800/50 text-surface-300">
-                {campaign.campaignContacts.length === 0 ? (
+                {contacts.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-surface-500">
                       Nenhum contato adicionado a esta campanha.
                     </td>
                   </tr>
                 ) : (
-                  (campaign.campaignContacts || []).map((cc: any) => (
+                  contacts.map((cc: any) => (
                     <tr key={cc.id} className="group hover:bg-surface-900/30">
                       <td className="py-3">
-                        <Link href={`/contacts/${cc.contact.id}`} className="font-medium text-primary-400 hover:underline">
-                          {cc.contact.email}
+                        <Link href={`/contacts/${cc.contact?.id}`} className="font-medium text-primary-400 hover:underline">
+                          {cc.contact?.email || "Email Indisponível"}
                         </Link>
-                        {cc.contact.name && <p className="text-xs text-surface-500">{cc.contact.name}</p>}
+                        {cc.contact?.name && <p className="text-xs text-surface-500">{cc.contact.name}</p>}
                       </td>
                       <td className="py-3">
                         {cc.currentStep ? (
@@ -119,10 +127,14 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                         ) : "Concluído"}
                       </td>
                       <td className="py-3">
-                        <StatusBadge status={cc.stepStatus} label={STEP_STATUS_LABELS[cc.stepStatus as keyof typeof STEP_STATUS_LABELS] ?? cc.stepStatus} dot />
+                        <StatusBadge 
+                          status={cc.stepStatus || "PENDING"} 
+                          label={STEP_STATUS_LABELS[cc.stepStatus as keyof typeof STEP_STATUS_LABELS] || cc.stepStatus} 
+                          dot 
+                        />
                       </td>
                       <td className="py-3 text-xs text-surface-500">
-                        {formatDate(cc.updatedAt)}
+                        {cc.updatedAt ? formatDate(cc.updatedAt) : "-"}
                       </td>
                     </tr>
                   ))

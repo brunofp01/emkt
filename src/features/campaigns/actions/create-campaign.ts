@@ -44,7 +44,8 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
       .from('Campaign')
       .insert({
         name: validated.name,
-        description: validated.description,
+        description: validated.description || null,
+        updatedAt: new Date().toISOString(),
       })
       .select()
       .single();
@@ -57,14 +58,15 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
       stepOrder: step.stepOrder,
       subject: step.subject,
       htmlBody: step.htmlBody,
-      textBody: step.textBody,
-      design: step.design,
+      textBody: step.textBody || null,
+      design: step.design || null,
       delayHours: step.delayHours,
       // A/B Testing Fields
       isABTest: step.isABTest,
       subjectB: step.subjectB || null,
       htmlBodyB: step.htmlBodyB || null,
       designB: step.designB || null,
+      updatedAt: new Date().toISOString(),
     }));
 
     const { error: stepsError } = await supabase
@@ -89,7 +91,10 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
   try {
     const { error } = await supabase
       .from('Campaign')
-      .update({ status: 'ACTIVE' })
+      .update({ 
+        status: 'ACTIVE',
+        updatedAt: new Date().toISOString() 
+      })
       .eq('id', campaignId);
 
     if (error) throw error;
@@ -136,7 +141,8 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
           contactId, 
           campaignId, 
           currentStepId: firstStep.id, 
-          stepStatus: "QUEUED" 
+          stepStatus: "QUEUED",
+          updatedAt: new Date().toISOString()
         })
         .select()
         .single();
@@ -204,7 +210,7 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
       .from('Campaign')
       .update({
         name: validated.name,
-        description: validated.description,
+        description: validated.description || null,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', campaignId);
@@ -225,13 +231,14 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
       stepOrder: step.stepOrder,
       subject: step.subject,
       htmlBody: step.htmlBody,
-      textBody: step.textBody,
-      design: step.design,
+      textBody: step.textBody || null,
+      design: step.design || null,
       delayHours: step.delayHours,
       isABTest: step.isABTest,
       subjectB: step.subjectB || null,
       htmlBodyB: step.htmlBodyB || null,
       designB: step.designB || null,
+      updatedAt: new Date().toISOString(),
     }));
 
     const { error: stepsError } = await supabase
