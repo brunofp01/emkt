@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/shared/lib/supabase"; // Usando o cliente Admin para estabilidade total
 import { inngest } from "@/shared/lib/inngest";
-import { crypto } from "crypto";
 
 // Função simples para gerar um ID compatível com o campo String do Prisma
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
