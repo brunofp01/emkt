@@ -136,6 +136,27 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
 }
 
 /**
+ * Pausa uma campanha.
+ */
+export async function pauseCampaign(campaignId: string): Promise<CampaignActionState> {
+  try {
+    const { error } = await supabase
+      .from('Campaign')
+      .update({ status: 'PAUSED', updatedAt: new Date().toISOString() })
+      .eq('id', campaignId);
+
+    if (error) throw error;
+
+    revalidatePath("/campaigns");
+    revalidatePath(`/campaigns/${campaignId}`);
+    return { success: true };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Erro ao pausar." };
+  }
+}
+
+
+/**
  * Adiciona contatos e inicia o fluxo.
  */
 export async function addContactsToCampaign(campaignId: string, contactIds: string[]): Promise<CampaignActionState> {
@@ -157,6 +178,7 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
       const { data: cc, error: ccError } = await supabase
         .from('CampaignContact')
         .upsert({
+          id: contactCampaignId,
           contactId,
           campaignId,
           currentStepId: firstStep.id,

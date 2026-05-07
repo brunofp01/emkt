@@ -5,7 +5,7 @@ import { getCampaignById } from "@/features/campaigns/lib/queries";
 import { CAMPAIGN_STATUS_LABELS, STEP_STATUS_LABELS } from "@/shared/lib/constants";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { formatDate } from "@/shared/lib/utils";
-import { activateCampaign } from "@/features/campaigns/actions/create-campaign";
+import { activateCampaign, pauseCampaign } from "@/features/campaigns/actions/create-campaign";
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -55,9 +55,14 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               </form>
             )}
             {campaign.status === "ACTIVE" && (
-              <button className="flex items-center gap-2 rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white shadow-lg shadow-warning/20 hover:bg-warning/90 active:scale-[0.97]">
-                <Pause className="h-4 w-4" /> Pausar
-              </button>
+              <form action={async () => {
+                "use server";
+                await pauseCampaign(campaign.id);
+              }}>
+                <button type="submit" className="flex items-center gap-2 rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white shadow-lg shadow-warning/20 hover:bg-warning/90 active:scale-[0.97]">
+                  <Pause className="h-4 w-4" /> Pausar
+                </button>
+              </form>
             )}
             <Link href={`/campaigns/${campaign.id}/analytics`} className="flex items-center gap-2 rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-surface-200 hover:bg-surface-700 active:scale-[0.97]">
               <BarChart3 className="h-4 w-4" /> Ver Analytics
