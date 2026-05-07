@@ -1,17 +1,27 @@
 "use client";
 
 import { useActionState } from "react";
-import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity } from "lucide-react";
-import { createContact, type CreateContactState } from "@/features/contacts/actions/create-contact";
+import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity, Edit2 } from "lucide-react";
+import { createContact, updateContact, type CreateContactState } from "@/features/contacts/actions/create-contact";
 
 interface ContactFormProps {
   campaigns: Array<{ id: string; name: string }>;
   onClose: () => void;
+  initialData?: {
+    id: string;
+    email: string;
+    name: string | null;
+    company: string | null;
+    phone: string | null;
+    tags: string[];
+    status: string;
+  };
 }
 
-export function ContactForm({ onClose, campaigns }: ContactFormProps) {
+export function ContactForm({ onClose, campaigns, initialData }: ContactFormProps) {
+  const isEditing = !!initialData;
   const [state, formAction, isPending] = useActionState<CreateContactState, FormData>(
-    createContact,
+    isEditing ? updateContact : createContact,
     {}
   );
 
@@ -29,11 +39,11 @@ export function ContactForm({ onClose, campaigns }: ContactFormProps) {
         <div className="flex items-center justify-between border-b border-surface-800/60 px-6 py-5 bg-surface-900/20">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-500 border border-primary-500/20">
-              <UserPlus className="h-6 w-6" />
+              {isEditing ? <Edit2 className="h-6 w-6" /> : <UserPlus className="h-6 w-6" />}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-surface-50">Novo Contato</h2>
-              <p className="text-xs text-surface-500 font-medium">Cadastre um lead manualmente</p>
+              <h2 className="text-lg font-bold text-surface-50">{isEditing ? "Editar Contato" : "Novo Contato"}</h2>
+              <p className="text-xs text-surface-500 font-medium">{isEditing ? "Atualize as informações do lead" : "Cadastre um lead manualmente"}</p>
             </div>
           </div>
           <button onClick={onClose} className="rounded-xl p-2 text-surface-500 hover:bg-surface-800 hover:text-surface-300 transition-all">
@@ -52,17 +62,27 @@ export function ContactForm({ onClose, campaigns }: ContactFormProps) {
           {state.success && (
             <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-400 flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-              Contato cadastrado com sucesso!
+              {isEditing ? "Contato atualizado com sucesso!" : "Contato cadastrado com sucesso!"}
             </div>
           )}
 
           <form action={formAction} className="space-y-5">
+            {isEditing && <input type="hidden" name="id" value={initialData.id} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="md:col-span-2">
                 <label htmlFor="contact-email" className={labelClass}>Email Principal *</label>
                 <div className="relative group">
-                  <Mail className={iconClass} />
-                  <input id="contact-email" name="email" type="email" required placeholder="ex: joao@empresa.com" className={inputClass} />
+                   <Mail className={iconClass} />
+                   <input 
+                    id="contact-email" 
+                    name="email" 
+                    type="email" 
+                    required 
+                    placeholder="ex: joao@empresa.com" 
+                    className={`${inputClass} ${isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    defaultValue={initialData?.email}
+                    readOnly={isEditing}
+                  />
                 </div>
               </div>
 
@@ -70,49 +90,51 @@ export function ContactForm({ onClose, campaigns }: ContactFormProps) {
                 <label htmlFor="contact-name" className={labelClass}>Nome Completo</label>
                 <div className="relative group">
                   <User className={iconClass} />
-                  <input id="contact-name" name="name" type="text" placeholder="ex: João Silva" className={inputClass} />
+                  <input id="contact-name" name="name" type="text" placeholder="ex: João Silva" className={inputClass} defaultValue={initialData?.name ?? ""} />
                 </div>
               </div>
-
+ 
               <div>
                 <label htmlFor="contact-phone" className={labelClass}>Telefone / WhatsApp</label>
                 <div className="relative group">
                   <Phone className={iconClass} />
-                  <input id="contact-phone" name="phone" type="tel" placeholder="ex: (11) 99999-9999" className={inputClass} />
+                  <input id="contact-phone" name="phone" type="tel" placeholder="ex: (11) 99999-9999" className={inputClass} defaultValue={initialData?.phone ?? ""} />
                 </div>
               </div>
-
+ 
               <div>
                 <label htmlFor="contact-company" className={labelClass}>Empresa</label>
                 <div className="relative group">
                   <Building2 className={iconClass} />
-                  <input id="contact-company" name="company" type="text" placeholder="ex: Tech Solutions" className={inputClass} />
+                  <input id="contact-company" name="company" type="text" placeholder="ex: Tech Solutions" className={inputClass} defaultValue={initialData?.company ?? ""} />
                 </div>
               </div>
-
+ 
               <div>
                 <label htmlFor="contact-tags" className={labelClass}>Tags (separadas por vírgula)</label>
                 <div className="relative group">
                   <Tag className={iconClass} />
-                  <input id="contact-tags" name="tags" type="text" placeholder="ex: lead, vip, 2024" className={inputClass} />
+                  <input id="contact-tags" name="tags" type="text" placeholder="ex: lead, vip, 2024" className={inputClass} defaultValue={initialData?.tags?.join(", ")} />
                 </div>
               </div>
 
-              <div className="md:col-span-2">
-                <label htmlFor="contact-campaign" className={labelClass}>Adicionar à Campanha</label>
-                <div className="relative group">
-                  <Activity className={iconClass} />
-                  <select id="contact-campaign" name="campaignId" className={inputClass}>
-                    <option value="">Nenhuma campanha (Apenas cadastrar)</option>
-                    {campaigns.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+              {!isEditing && (
+                <div className="md:col-span-2">
+                  <label htmlFor="contact-campaign" className={labelClass}>Adicionar à Campanha</label>
+                  <div className="relative group">
+                    <Activity className={iconClass} />
+                    <select id="contact-campaign" name="campaignId" className={inputClass}>
+                      <option value="">Nenhuma campanha (Apenas cadastrar)</option>
+                      {campaigns.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="mt-1.5 text-[10px] text-surface-500 italic ml-1">
+                    Se selecionado, o contato iniciará o fluxo de emails automaticamente.
+                  </p>
                 </div>
-                <p className="mt-1.5 text-[10px] text-surface-500 italic ml-1">
-                  Se selecionado, o contato iniciará o fluxo de emails automaticamente.
-                </p>
-              </div>
+              )}
             </div>
 
             <div className="pt-4">
@@ -124,7 +146,10 @@ export function ContactForm({ onClose, campaigns }: ContactFormProps) {
                 {isPending ? (
                   <><Loader2 className="h-5 w-5 animate-spin" /> Processando...</>
                 ) : (
-                  <><UserPlus className="h-5 w-5" /> Confirmar Cadastro</>
+                  <>
+                    {isEditing ? <Edit2 className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+                    {isEditing ? "Salvar Alterações" : "Confirmar Cadastro"}
+                  </>
                 )}
               </button>
             </div>

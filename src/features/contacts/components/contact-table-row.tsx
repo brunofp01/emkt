@@ -1,8 +1,11 @@
+import { useState } from "react";
 import Link from "next/link";
 import { PROVIDER_LABELS, PROVIDER_COLORS, STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
-import { Tag, Building2, User, ChevronRight, Activity, Calendar, MoreHorizontal } from "lucide-react";
+import { Tag, Building2, User, ChevronRight, Activity, Calendar, MoreHorizontal, Trash2, Edit2, Loader2 } from "lucide-react";
+import { deleteContact } from "@/features/contacts/actions/create-contact";
+import { ContactForm } from "./contact-form";
 
 interface ContactTableRowProps {
   contact: {
@@ -10,6 +13,7 @@ interface ContactTableRowProps {
     email: string;
     name: string | null;
     company: string | null;
+    phone?: string | null;
     provider: string;
     status: string;
     tags: string[];
@@ -21,13 +25,28 @@ interface ContactTableRowProps {
     }>;
     emailEvents: Array<{ eventType: string; timestamp: Date }>;
   };
+  campaigns: Array<{ id: string; name: string }>;
 }
 
-export function ContactTableRow({ contact }: ContactTableRowProps) {
+export function ContactTableRow({ contact, campaigns }: ContactTableRowProps) {
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const providerLabel = PROVIDER_LABELS[contact.provider as keyof typeof PROVIDER_LABELS] ?? contact.provider;
   const providerColor = PROVIDER_COLORS[contact.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
   const campaign = contact.campaignContacts[0];
   const lastEvent = contact.emailEvents[0];
+
+  const handleDelete = async () => {
+    if (!confirm(`Tem certeza que deseja excluir o contato ${contact.email}?`)) return;
+    setIsDeleting(true);
+    try {
+      await deleteContact(contact.id);
+    } catch (err) {
+      alert("Erro ao excluir contato.");
+      setIsDeleting(false);
+    }
+  };
 
   // Calcular "Saúde" do Lead baseada em eventos (exemplo simples)
   const health = contact.emailEvents.length > 2 ? 'ACTIVE' : (contact.emailEvents.length > 0 ? 'PAUSED' : 'PENDING');
@@ -112,9 +131,38 @@ export function ContactTableRow({ contact }: ContactTableRowProps) {
       </td>
 
       <td className="px-6 py-4 text-right">
-        <button className="p-2 text-surface-600 hover:text-surface-200 transition-colors">
-          <MoreHorizontal className="h-5 w-5" />
-        </button>
+        <div className="flex justify-end gap-2">
+          <button 
+            onClick={() => setShowEditForm(true)}
+            className="p-2 text-surface-600 hover:text-primary-400 hover:bg-primary-500/5 rounded-xl transition-all"
+            title="Editar"
+          >
+            <Edit2 className="h-4.5 w-4.5" />
+          </button>
+          <button 
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-2 text-surface-600 hover:text-red-400 hover:bg-red-500/5 rounded-xl transition-all disabled:opacity-30"
+            title="Excluir"
+          >
+            {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Trash2 className="h-4.5 w-4.5" />}
+          </button>
+        </div>
+        {showEditForm && (
+          <ContactForm 
+            onClose={() => setShowEditForm(false)} 
+            campaigns={campaigns} 
+            initialData={{
+              id: contact.id,
+              email: contact.email,
+              name: contact.name,
+              company: contact.company,
+              phone: contact.phone ?? null,
+              tags: contact.tags,
+              status: contact.status
+            }}
+          />
+        )}
       </td>
     </tr>
   );

@@ -162,7 +162,7 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns }: C
                   </tr>
                 ) : (
                   contacts.map((contact) => (
-                    <ContactTableRow key={contact.id} contact={contact} />
+                    <ContactTableRow key={contact.id} contact={contact} campaigns={campaigns} />
                   ))
                 )}
               </tbody>
