@@ -2,8 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/shared/lib/prisma";
+import { supabaseAdmin as supabase } from "@/shared/lib/supabase"; // Usando o cliente Admin para estabilidade total
 import { inngest } from "@/shared/lib/inngest";
+import { crypto } from "crypto";
+
+// Função simples para gerar um ID compatível com o campo String do Prisma
+const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 const DEFAULT_TEMPLATE = `
 <!DOCTYPE html>
@@ -32,7 +36,7 @@ const DEFAULT_TEMPLATE = `
 const campaignStepSchema = z.object({
   stepOrder: z.number().int().positive(),
   subject: z.string().min(1, "Assunto obrigatório"),
-  htmlBody: z.string(), // Permitimos vazio para injetar o padrão
+  htmlBody: z.string(),
   textBody: z.string().optional(),
   design: z.any().optional(),
   delayHours: z.number().int().min(0).default(0),
@@ -51,43 +55,58 @@ const createCampaignSchema = z.object({
 export type CampaignActionState = { success?: boolean; error?: string; campaignId?: string };
 
 /**
- * Cria uma nova campanha usando Prisma.
+ * Cria uma nova campanha usando o Supabase SDK (HTTPS) para estabilidade máxima.
  */
 export async function createCampaign(_prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
     const stepsRaw = formData.get("steps") as string;
     const name = formData.get("name") as string;
-    const description = (formData.get("description") as string) || undefined;
+    const description = (formData.get("description") as string) || null;
 
     if (!stepsRaw) throw new Error("O campo 'steps' está ausente no FormData.");
 
     const parsedSteps = JSON.parse(stepsRaw);
     const validated = createCampaignSchema.parse({ name, description, steps: parsedSteps });
 
-    // Criar campanha e etapas em uma única transação atômica
-    const campaign = await prisma.campaign.create({
-      data: {
+    // 1. Criar a Campanha
+    const campaignId = generateId();
+    const { error: campaignError } = await supabase
+      .from('Campaign')
+      .insert({
+        id: campaignId,
         name: validated.name,
         description: validated.description || null,
-        steps: {
-          create: validated.steps.map(step => ({
-            stepOrder: step.stepOrder,
-            subject: step.subject,
-            htmlBody: step.htmlBody.trim() || DEFAULT_TEMPLATE,
-            textBody: step.textBody || null,
-            design: step.design || { isDefault: true },
-            delayHours: step.delayHours,
-            isABTest: step.isABTest,
-            subjectB: step.subjectB || null,
-            htmlBodyB: (step.isABTest && !step.htmlBodyB?.trim()) ? DEFAULT_TEMPLATE : (step.htmlBodyB || null),
-            designB: step.designB || null,
-          }))
-        }
-      }
-    });
+        status: 'DRAFT',
+        updatedAt: new Date().toISOString(),
+      });
+
+    if (campaignError) throw new Error(`Erro ao criar campanha: ${campaignError.message}`);
+
+    // 2. Criar as Etapas
+    const stepsToInsert = validated.steps.map(step => ({
+      id: generateId(),
+      campaignId: campaignId,
+      stepOrder: step.stepOrder,
+      subject: step.subject,
+      htmlBody: step.htmlBody.trim() || DEFAULT_TEMPLATE,
+      textBody: step.textBody || null,
+      design: step.design || { isDefault: true },
+      delayHours: step.delayHours,
+      isABTest: step.isABTest,
+      subjectB: step.subjectB || null,
+      htmlBodyB: (step.isABTest && !step.htmlBodyB?.trim()) ? DEFAULT_TEMPLATE : (step.htmlBodyB || null),
+      designB: step.designB || null,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    const { error: stepsError } = await supabase
+      .from('CampaignStep')
+      .insert(stepsToInsert);
+
+    if (stepsError) throw new Error(`Erro ao criar etapas: ${stepsError.message}`);
 
     revalidatePath("/campaigns");
-    return { success: true, campaignId: campaign.id };
+    return { success: true, campaignId };
   } catch (err: any) {
     console.error('Action error (createCampaign):', err);
     if (err instanceof z.ZodError) {
@@ -102,13 +121,12 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
  */
 export async function activateCampaign(campaignId: string): Promise<CampaignActionState> {
   try {
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { 
-        status: 'ACTIVE',
-        updatedAt: new Date()
-      }
-    });
+    const { error } = await supabase
+      .from('Campaign')
+      .update({ status: 'ACTIVE', updatedAt: new Date().toISOString() })
+      .eq('id', campaignId);
+
+    if (error) throw error;
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);
@@ -123,29 +141,33 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
  */
 export async function addContactsToCampaign(campaignId: string, contactIds: string[]): Promise<CampaignActionState> {
   try {
-    const firstStep = await prisma.campaignStep.findFirst({
-      where: { campaignId },
-      orderBy: { stepOrder: 'asc' }
-    });
+    // Buscar primeira etapa
+    const { data: steps, error: stepsError } = await supabase
+      .from('CampaignStep')
+      .select('id, subject, htmlBody, textBody')
+      .eq('campaignId', campaignId)
+      .order('stepOrder', { ascending: true })
+      .limit(1);
 
-    if (!firstStep) return { error: "Campanha sem etapas." };
+    if (stepsError || !steps?.[0]) return { error: "Campanha sem etapas." };
+    const firstStep = steps[0];
 
     for (const contactId of contactIds) {
-      // Upsert para evitar duplicidade e garantir vínculo
-      const cc = await prisma.campaignContact.upsert({
-        where: {
-          contactId_campaignId: { contactId, campaignId }
-        },
-        update: {
-          updatedAt: new Date()
-        },
-        create: {
+      const contactCampaignId = generateId();
+      
+      const { data: cc, error: ccError } = await supabase
+        .from('CampaignContact')
+        .upsert({
           contactId,
           campaignId,
           currentStepId: firstStep.id,
-          stepStatus: "QUEUED"
-        }
-      });
+          stepStatus: 'QUEUED',
+          updatedAt: new Date().toISOString(),
+        }, { onConflict: 'contactId,campaignId' })
+        .select()
+        .single();
+
+      if (ccError) continue;
 
       await inngest.send({
         name: "email/send",
@@ -172,9 +194,12 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
  */
 export async function deleteCampaign(campaignId: string): Promise<CampaignActionState> {
   try {
-    await prisma.campaign.delete({
-      where: { id: campaignId }
-    });
+    const { error } = await supabase
+      .from('Campaign')
+      .delete()
+      .eq('id', campaignId);
+
+    if (error) throw error;
 
     revalidatePath("/campaigns");
     return { success: true };
@@ -189,48 +214,50 @@ export async function deleteCampaign(campaignId: string): Promise<CampaignAction
  */
 export async function updateCampaign(campaignId: string, _prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
-    const raw = {
-      name: formData.get("name") as string,
-      description: (formData.get("description") as string) || undefined,
-      steps: JSON.parse((formData.get("steps") as string) || "[]"),
-    };
-    const validated = createCampaignSchema.parse(raw);
+    const stepsRaw = formData.get("steps") as string;
+    const name = formData.get("name") as string;
+    const description = (formData.get("description") as string) || null;
 
-    await prisma.$transaction(async (tx) => {
-      // 1. Atualizar dados básicos
-      await tx.campaign.update({
-        where: { id: campaignId },
-        data: {
-          name: validated.name,
-          description: validated.description || null,
-          updatedAt: new Date(),
-        }
-      });
+    const parsedSteps = JSON.parse(stepsRaw || "[]");
+    const validated = createCampaignSchema.parse({ name, description, steps: parsedSteps });
 
-      // 2. Limpar etapas antigas
-      await tx.campaignStep.deleteMany({
-        where: { campaignId }
-      });
+    // 1. Atualizar dados básicos
+    const { error: updateError } = await supabase
+      .from('Campaign')
+      .update({
+        name: validated.name,
+        description: validated.description,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', campaignId);
 
-      // 3. Criar novas etapas
-      for (const step of validated.steps) {
-        await tx.campaignStep.create({
-          data: {
-            campaignId,
-            stepOrder: step.stepOrder,
-            subject: step.subject,
-            htmlBody: step.htmlBody,
-            textBody: step.textBody || null,
-            design: step.design || null,
-            delayHours: step.delayHours,
-            isABTest: step.isABTest,
-            subjectB: step.subjectB || null,
-            htmlBodyB: step.htmlBodyB || null,
-            designB: step.designB || null,
-          }
-        });
-      }
-    });
+    if (updateError) throw updateError;
+
+    // 2. Limpar etapas antigas
+    await supabase.from('CampaignStep').delete().eq('campaignId', campaignId);
+
+    // 3. Criar novas etapas
+    const stepsToInsert = validated.steps.map(step => ({
+      id: generateId(),
+      campaignId,
+      stepOrder: step.stepOrder,
+      subject: step.subject,
+      htmlBody: step.htmlBody.trim() || DEFAULT_TEMPLATE,
+      textBody: step.textBody || null,
+      design: step.design || { isDefault: true },
+      delayHours: step.delayHours,
+      isABTest: step.isABTest,
+      subjectB: step.subjectB || null,
+      htmlBodyB: (step.isABTest && !step.htmlBodyB?.trim()) ? DEFAULT_TEMPLATE : (step.htmlBodyB || null),
+      designB: step.designB || null,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    const { error: stepsError } = await supabase
+      .from('CampaignStep')
+      .insert(stepsToInsert);
+
+    if (stepsError) throw stepsError;
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);
