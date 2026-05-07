@@ -1,69 +1,72 @@
 export const dynamic = "force-dynamic";
 
 import { getDashboardStats } from "@/features/analytics/lib/queries";
-import { PROVIDER_LABELS, PROVIDER_COLORS, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/lib/constants";
+import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 import { calcPercentage } from "@/shared/lib/utils";
-import { BarChart3, TrendingUp, Users, Mail } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Mail, PieChart, Info } from "lucide-react";
+import { DashboardCharts } from "@/features/analytics/components/dashboard-charts";
 
 export default async function AnalyticsPage() {
   const stats = await getDashboardStats();
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-surface-50">Analytics Global</h1>
-        <p className="mt-1 text-sm text-surface-500">Métricas consolidadas de todas as campanhas e provedores.</p>
+    <div className="space-y-8 animate-fade-in pb-10">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-surface-50">Analytics Global</h1>
+          <p className="mt-1 text-sm text-surface-500">Inteligência consolidada e análise de performance profunda.</p>
+        </div>
+        <div className="p-2 rounded-lg bg-surface-900 border border-surface-800">
+          <PieChart className="h-6 w-6 text-primary-500" />
+        </div>
       </div>
 
+      {/* Grid de KPIs Secundários */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="glass-card p-6 border-l-4 border-indigo-500">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-surface-400">Total de Contatos</h3>
-            <Users className="h-5 w-5 text-indigo-400" />
+        {[
+          { label: "Base de Contatos", value: stats.totalContacts, icon: Users, color: "text-indigo-400" },
+          { label: "Cliques Totais", value: stats.totalClicked, icon: TrendingUp, color: "text-cyan-400" },
+          { label: "Bounces (Erros)", value: stats.totalBounced, icon: Info, color: "text-amber-400" },
+          { label: "CTR (Click Rate)", value: `${stats.clickRate}%`, icon: BarChart3, color: "text-violet-400" },
+        ].map((kpi) => (
+          <div key={kpi.label} className="glass-card p-6">
+            <div className="flex items-center gap-3 mb-2">
+              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-surface-500">{kpi.label}</h3>
+            </div>
+            <p className="text-3xl font-black text-surface-50">{kpi.value.toLocaleString('pt-BR')}</p>
           </div>
-          <p className="mt-2 text-3xl font-bold text-surface-50">{stats.totalContacts}</p>
-        </div>
-        <div className="glass-card p-6 border-l-4 border-cyan-500">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-surface-400">Campanhas Ativas</h3>
-            <Mail className="h-5 w-5 text-cyan-400" />
-          </div>
-          <p className="mt-2 text-3xl font-bold text-surface-50">{stats.activeCampaigns}</p>
-        </div>
-        <div className="glass-card p-6 border-l-4 border-emerald-500">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-surface-400">Total de Emails Enviados</h3>
-            <TrendingUp className="h-5 w-5 text-emerald-400" />
-          </div>
-          <p className="mt-2 text-3xl font-bold text-surface-50">{stats.totalSent}</p>
-        </div>
-        <div className="glass-card p-6 border-l-4 border-violet-500">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-surface-400">Aberturas Globais</h3>
-            <BarChart3 className="h-5 w-5 text-violet-400" />
-          </div>
-          <p className="mt-2 text-3xl font-bold text-surface-50">{stats.totalOpened}</p>
-          <p className="mt-1 text-xs text-surface-500">{stats.openRate}% de taxa de abertura</p>
-        </div>
+        ))}
       </div>
+
+      {/* Visualizações de Gráficos (Reutilizando componentes premium) */}
+      <DashboardCharts funnelData={stats.funnelData} trendData={stats.trendData} />
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Distribuição por Provedor */}
         <div className="glass-card p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-surface-400">Distribuição por Provedor</h2>
-          <div className="space-y-4">
+          <h2 className="mb-6 text-sm font-bold uppercase tracking-widest text-surface-400">Eficiência por Provedor</h2>
+          <div className="space-y-5">
             {stats.providerCounts.map((p) => {
               const percentage = calcPercentage(p.count, stats.totalContacts);
               const providerColor = PROVIDER_COLORS[p.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
               return (
-                <div key={p.provider}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="font-medium text-surface-300">
+                <div key={p.provider} className="group">
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="font-bold text-surface-300">
                       {PROVIDER_LABELS[p.provider as keyof typeof PROVIDER_LABELS] ?? p.provider}
                     </span>
-                    <span className="text-surface-400">{p.count} ({percentage}%)</span>
+                    <span className="text-surface-500 font-mono">{p.count} ({percentage}%)</span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-800">
-                    <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: providerColor }} />
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-900 border border-surface-800/50">
+                    <div 
+                      className="h-full rounded-full transition-all duration-1000" 
+                      style={{ 
+                        width: `${percentage}%`, 
+                        backgroundColor: providerColor,
+                        boxShadow: `0 0 8px ${providerColor}30`
+                      }} 
+                    />
                   </div>
                 </div>
               );
@@ -71,26 +74,22 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Campanhas e Status */}
         <div className="glass-card p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-surface-400">Distribuição de Eventos</h2>
-          <div className="space-y-4">
-             {Object.entries(stats.eventMap).sort(([, a], [, b]) => b - a).map(([event, count]) => {
-                const percentage = calcPercentage(count, stats.totalEvents);
-                const color = EVENT_TYPE_COLORS[event as keyof typeof EVENT_TYPE_COLORS] ?? "#6b7280";
-                return (
-                  <div key={event}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-surface-300">
-                        {EVENT_TYPE_LABELS[event as keyof typeof EVENT_TYPE_LABELS] ?? event}
-                      </span>
-                      <span className="text-surface-400">{count} ({percentage}%)</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-800">
-                      <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: color }} />
-                    </div>
-                  </div>
-                );
-             })}
+          <h2 className="mb-6 text-sm font-bold uppercase tracking-widest text-surface-400">Campanhas em Monitoramento</h2>
+          <div className="space-y-3">
+            {stats.campaignsPerformance.map((campaign) => (
+              <div key={campaign.id} className="flex items-center justify-between p-4 rounded-xl bg-surface-900/30 border border-surface-800/50">
+                <div className="flex items-center gap-3">
+                  <div className={`h-2 w-2 rounded-full ${campaign.status === 'ACTIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-surface-600'}`} />
+                  <span className="text-sm font-bold text-surface-200">{campaign.name}</span>
+                </div>
+                <span className="text-[10px] font-bold text-surface-500 uppercase tracking-widest">{campaign.status}</span>
+              </div>
+            ))}
+            {stats.campaignsPerformance.length === 0 && (
+              <p className="text-center py-10 text-xs text-surface-600 uppercase tracking-widest italic">Nenhuma campanha encontrada</p>
+            )}
           </div>
         </div>
       </div>
