@@ -2,12 +2,13 @@
 
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createCampaign, type CampaignActionState } from "@/features/campaigns/actions/create-campaign";
+import { updateCampaign, type CampaignActionState } from "@/features/campaigns/actions/create-campaign";
 import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info } from "lucide-react";
 import Link from "next/link";
 import { EmailCodeEditor } from "@/features/campaigns/components/email-code-editor";
 
 interface StepData {
+  id?: string;
   stepOrder: number;
   subject: string;
   htmlBody: string;
@@ -15,34 +16,42 @@ interface StepData {
   design: any;
   conditions: any;
   delayHours: number;
-  // A/B Testing Fields
   isABTest: boolean;
   subjectB: string;
   htmlBodyB: string;
   designB: any;
 }
 
-export default function NewCampaignPage() {
+export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const router = useRouter();
-  const [steps, setSteps] = useState<StepData[]>([
-    { 
-      stepOrder: 1, subject: "", htmlBody: "", textBody: "", design: null, conditions: null, delayHours: 0,
-      isABTest: false, subjectB: "", htmlBodyB: "", designB: null
-    },
-  ]);
+  const [steps, setSteps] = useState<StepData[]>(campaign.steps.map((s: any) => ({
+    id: s.id,
+    stepOrder: s.stepOrder,
+    subject: s.subject,
+    htmlBody: s.htmlBody,
+    textBody: s.textBody || "",
+    design: s.design,
+    conditions: s.conditions,
+    delayHours: s.delayHours,
+    isABTest: s.isABTest,
+    subjectB: s.subjectB || "",
+    htmlBodyB: s.htmlBodyB || "",
+    designB: s.designB,
+  })));
 
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [editingVariant, setEditingVariant] = useState<"A" | "B">("A");
 
   const [state, formAction, isPending] = useActionState<CampaignActionState, FormData>(
-    createCampaign, {}
+    updateCampaign.bind(null, campaign.id), {}
   );
 
   useEffect(() => {
     if (state.success) {
-      router.push(`/campaigns/${state.campaignId}`);
+      router.push(`/campaigns/${campaign.id}`);
+      router.refresh();
     }
-  }, [state.success, state.campaignId, router]);
+  }, [state.success, campaign.id, router]);
 
   const addStep = () => {
     setSteps((prev) => [...prev, {
@@ -63,7 +72,7 @@ export default function NewCampaignPage() {
     if (editingStepIndex !== null) {
       if (editingVariant === "A") {
         updateStep(editingStepIndex, "htmlBody", html);
-        updateStep(editingStepIndex, "design", { isCode: true }); // Marcador de design concluído
+        updateStep(editingStepIndex, "design", { isCode: true });
       } else {
         updateStep(editingStepIndex, "htmlBodyB", html);
         updateStep(editingStepIndex, "designB", { isCode: true });
@@ -90,16 +99,14 @@ export default function NewCampaignPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 animate-fade-in pb-20">
-      <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
-        <ArrowLeft className="h-4 w-4" /> Voltar
+    <div className="space-y-6">
+      <Link href={`/campaigns/${campaign.id}`} className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
+        <ArrowLeft className="h-4 w-4" /> Cancelar Edição
       </Link>
 
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-surface-50">Nova Campanha</h1>
-          <p className="mt-1 text-sm text-surface-500">Arquitete sua régua de prospecção com design de nível mundial.</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-surface-50">Editar Campanha</h1>
+        <p className="mt-1 text-sm text-surface-500">Ajuste sua régua de prospecção.</p>
       </div>
 
       {state.error && (
@@ -116,11 +123,11 @@ export default function NewCampaignPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className={labelClass}>Nome da Campanha *</label>
-              <input name="name" required placeholder="Ex: Prospecção Imobiliária 2026" className={inputClass} />
+              <input name="name" defaultValue={campaign.name} required className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Descrição</label>
-              <input name="description" placeholder="Breve descrição interna" className={inputClass} />
+              <input name="description" defaultValue={campaign.description || ""} className={inputClass} />
             </div>
           </div>
         </div>
@@ -154,15 +161,14 @@ export default function NewCampaignPage() {
                   </div>
                 </div>
 
-                {/* Versão A */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-[0.2em]">
-                    <span>Variante A (Controle)</span>
+                    <span>Variante A</span>
                   </div>
                   <div className="grid gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-8">
                       <label className={labelClass}>Assunto Variante A *</label>
-                      <input required value={step.subject} onChange={(e) => updateStep(idx, "subject", e.target.value)} placeholder="Assunto versão A" className={inputClass} />
+                      <input required value={step.subject} onChange={(e) => updateStep(idx, "subject", e.target.value)} className={inputClass} />
                     </div>
                     <div className="lg:col-span-4">
                       <label className={labelClass}>Aguardar (Horas)</label>
@@ -170,59 +176,26 @@ export default function NewCampaignPage() {
                     </div>
                   </div>
                   <button type="button" onClick={() => { setEditingVariant("A"); setEditingStepIndex(idx); }} className="flex items-center gap-2 text-xs font-bold text-primary-400 hover:text-primary-300">
-                    <Layout className="h-3 w-3" /> {step.design ? 'Editar Design A' : 'Criar Design A'}
+                    <Layout className="h-3 w-3" /> Editar Código HTML A
                   </button>
                 </div>
 
-                {/* Versão B (Condicional) */}
                 {step.isABTest && (
                   <div className="pt-6 border-t border-surface-800/50 space-y-4 animate-in slide-in-from-top-2">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-violet-400 uppercase tracking-[0.2em]">
-                      <Split className="h-3 w-3" /> Variante B (Desafiante)
+                      <Split className="h-3 w-3" /> Variante B
                     </div>
                     <div className="grid gap-6">
                       <div>
                         <label className={labelClass}>Assunto Variante B *</label>
-                        <input required value={step.subjectB} onChange={(e) => updateStep(idx, "subjectB", e.target.value)} placeholder="Assunto diferente para testar performance" className={inputClass} />
+                        <input required value={step.subjectB} onChange={(e) => updateStep(idx, "subjectB", e.target.value)} className={inputClass} />
                       </div>
                     </div>
                     <button type="button" onClick={() => { setEditingVariant("B"); setEditingStepIndex(idx); }} className="flex items-center gap-2 text-xs font-bold text-violet-400 hover:text-violet-300">
-                      <Layout className="h-3 w-3" /> {step.designB ? 'Editar Design B' : 'Criar Design B'}
+                      <Layout className="h-3 w-3" /> Editar Código HTML B
                     </button>
                   </div>
                 )}
-
-                {/* Automação e Branching */}
-                <div className="rounded-xl bg-surface-900/50 border border-surface-800 p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary-400" />
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-surface-400">Roteamento</h3>
-                    </div>
-                    {step.isABTest && (
-                      <span className="text-[10px] text-surface-600 flex items-center gap-1">
-                        <Info className="h-3 w-3" /> Divisão 50/50 automática
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-surface-300">
-                    <span>Se clicar, pular para</span>
-                    <select
-                      value={step.conditions?.[0]?.nextStepOrder || ""}
-                      onChange={(e) => {
-                        const nextOrder = parseInt(e.target.value);
-                        const newConditions: any[] | null = nextOrder ? [{ on: "CLICKED", nextStepOrder: nextOrder }] : null;
-                        updateStep(idx, "conditions", newConditions);
-                      }}
-                      className="bg-surface-800 border border-surface-700 rounded px-2 py-1 text-xs focus:border-primary-500"
-                    >
-                      <option value="">Próxima Etapa</option>
-                      {steps.map((_, sIdx) => sIdx + 1 > step.stepOrder && (
-                        <option key={sIdx} value={sIdx + 1}>Etapa {sIdx + 1}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
               </div>
             </div>
           ))}
@@ -239,7 +212,7 @@ export default function NewCampaignPage() {
               disabled={isPending || steps.some(s => !s.subject || (s.isABTest && !s.subjectB))} 
               className="flex items-center justify-center gap-3 rounded-lg bg-primary-600 px-8 py-3 text-base font-bold text-white shadow-xl shadow-primary-600/20 hover:bg-primary-500 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {isPending ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Mail className="h-5 w-5" /> Salvar Campanha Profissional</>}
+              {isPending ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Save className="h-5 w-5" /> Salvar Alterações</>}
             </button>
           </div>
         </div>
@@ -247,3 +220,7 @@ export default function NewCampaignPage() {
     </div>
   );
 }
+
+const Save = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+);

@@ -4,7 +4,8 @@ import { getCampaigns } from "@/features/campaigns/lib/queries";
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_STATUS_COLORS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
-import { Mail, Users, Plus, ChevronRight } from "lucide-react";
+import { CampaignActions } from "@/features/campaigns/components/campaign-actions";
+import { Mail, Users, Plus } from "lucide-react";
 import Link from "next/link";
 
 export default async function CampaignsPage() {
@@ -33,21 +34,23 @@ export default async function CampaignsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {campaigns.map((campaign) => (
-            <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className="glass-card group p-5 transition-all hover:scale-[1.01]">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-surface-100 group-hover:text-primary-400 transition-colors">{campaign.name}</h3>
-                  {campaign.description && <p className="mt-1 text-xs text-surface-500 line-clamp-2">{campaign.description}</p>}
+            <div key={campaign.id} className="relative group">
+              <Link href={`/campaigns/${campaign.id}`} className="block glass-card p-5 transition-all hover:border-primary-500/30">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 pr-2">
+                    <h3 className="font-semibold text-surface-100 group-hover:text-primary-400 transition-colors truncate">{campaign.name}</h3>
+                    {campaign.description && <p className="mt-1 text-xs text-surface-500 line-clamp-1">{campaign.description}</p>}
+                  </div>
+                  <CampaignActions campaignId={campaign.id} />
                 </div>
-                <ChevronRight className="h-5 w-5 text-surface-600 group-hover:text-primary-400 transition-colors" />
-              </div>
-              <div className="mt-4 flex items-center gap-3 text-xs text-surface-500">
-                <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ?? campaign.status} size="sm" dot />
-                <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{campaign.steps.length} etapas</span>
-                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{campaign._count.campaignContacts} contatos</span>
-              </div>
-              <p className="mt-3 text-[10px] text-surface-600">Criada em {formatDate(campaign.createdAt)}</p>
-            </Link>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] text-surface-500">
+                  <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ?? campaign.status} size="sm" dot />
+                  <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{campaign.steps.length} etapas</span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{campaign._count.campaignContacts} contatos</span>
+                </div>
+                <p className="mt-3 text-[10px] text-surface-600">Criada em {formatDate(campaign.createdAt)}</p>
+              </Link>
+            </div>
           ))}
         </div>
       )}
