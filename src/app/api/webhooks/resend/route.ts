@@ -1,18 +1,15 @@
 /**
  * Webhook — Resend
- * 
- * Processa eventos do Resend usando verificação Svix.
- * Eventos: email.sent, email.delivered, email.opened, email.clicked, email.bounced, email.complained
+ * Refatorado para usar Supabase SDK (HTTPS).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
-import { prisma } from "@/shared/lib/prisma";
+import { supabase } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 import type { EmailEventType } from "@prisma/client";
 
 const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET!;
 
-/** Mapeia eventos Resend para nosso enum interno */
 const eventMap: Record<string, EmailEventType> = {
   "email.sent": "SENT",
   "email.delivered": "DELIVERED",
@@ -32,7 +29,6 @@ export async function POST(req: NextRequest) {
       "svix-signature": req.headers.get("svix-signature") ?? "",
     };
 
-    // Verificar assinatura Svix
     const wh = new Webhook(RESEND_WEBHOOK_SECRET);
     const payload = wh.verify(body, headers) as Record<string, unknown>;
 
@@ -45,17 +41,28 @@ export async function POST(req: NextRequest) {
     const messageId = (data.email_id as string) ?? "";
     const recipientEmail = Array.isArray(data.to) ? data.to[0] : (data.to as string);
 
-    // Idempotência: verificar se já processamos este evento
-    const existing = await prisma.emailEvent.findUnique({ where: { externalId } });
+    // Idempotência via HTTPS
+    const { data: existing } = await supabase
+      .from('EmailEvent')
+      .select('id')
+      .eq('externalId', externalId)
+      .single();
+
     if (existing) return NextResponse.json({ duplicate: true }, { status: 200 });
 
-    // Buscar contato pelo email
-    const contact = await prisma.contact.findUnique({ where: { email: recipientEmail } });
+    // Buscar contato via HTTPS
+    const { data: contact } = await supabase
+      .from('Contact')
+      .select('id')
+      .eq('email', recipientEmail)
+      .single();
+
     if (!contact) return NextResponse.json({ skipped: true, reason: "contact not found" }, { status: 200 });
 
-    // Salvar evento
-    await prisma.emailEvent.create({
-      data: {
+    // Salvar evento via HTTPS
+    const { error: eventError } = await supabase
+      .from('EmailEvent')
+      .insert({
         externalId,
         contactId: contact.id,
         messageId,
@@ -66,20 +73,19 @@ export async function POST(req: NextRequest) {
         clickedUrl: ((data.click as Record<string, unknown>)?.link as string) ?? null,
         bounceReason: ((data.bounce as Record<string, unknown>)?.message as string) ?? null,
         rawPayload: payload as any,
-        timestamp: new Date((data.created_at as string) ?? Date.now()),
-      },
-    });
+        timestamp: new Date((data.created_at as string) ?? Date.now()).toISOString(),
+      });
 
-    // Se foi abertura, disparar processamento da régua
+    if (eventError) throw eventError;
+
     if (mappedType === "OPENED") {
       await inngest.send({ name: "email/opened", data: { messageId } });
     }
 
-    // Atualizar status do contato em caso de bounce/spam
     if (mappedType === "BOUNCED_HARD") {
-      await prisma.contact.update({ where: { id: contact.id }, data: { status: "BOUNCED" } });
+      await supabase.from('Contact').update({ status: "BOUNCED" }).eq('id', contact.id);
     } else if (mappedType === "COMPLAINED") {
-      await prisma.contact.update({ where: { id: contact.id }, data: { status: "COMPLAINED" } });
+      await supabase.from('Contact').update({ status: "COMPLAINED" }).eq('id', contact.id);
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
