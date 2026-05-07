@@ -40,7 +40,12 @@ export default async function AnalyticsPage() {
       </div>
 
       {/* Visualizações de Gráficos (Reutilizando componentes premium) */}
-      <DashboardCharts funnelData={stats.funnelData} trendData={stats.trendData} />
+      <DashboardCharts 
+        funnelData={stats.funnelData} 
+        trendData={stats.trendData} 
+        growthData={stats.growthData}
+        campaignPerformance={stats.campaignsPerformance}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Distribuição por Provedor */}
