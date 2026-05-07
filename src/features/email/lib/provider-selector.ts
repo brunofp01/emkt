@@ -8,20 +8,32 @@ import type { EmailProvider } from "@/shared/types";
  * Seleciona o melhor provedor usando agregação nativa do banco (O(1)).
  */
 export async function selectProviderForNewContact(): Promise<EmailProvider> {
+  console.log('[Diagnostic] Iniciando seleção de provedor...');
   // 1. Busca provedores ativos
   const { data: activeProviders, error: configError } = await supabaseAdmin
     .from('ProviderConfig')
     .select('*')
     .eq('isActive', true);
 
-  if (configError) throw configError;
+  if (configError) {
+    console.error('[Diagnostic] Erro ao buscar ProviderConfig:', configError);
+    throw configError;
+  }
+  
+  console.log('[Diagnostic] Provedores ativos encontrados:', activeProviders?.length ?? 0);
+  
   if (!activeProviders || activeProviders.length === 0) {
-    throw new Error("Nenhum provedor de email ativo.");
+    throw new Error("Nenhum provedor de email ativo no banco (tabela ProviderConfig).");
   }
 
   // 2. Busca distribuição via RPC (Agregação no Postgres - Alta Performance)
+  console.log('[Diagnostic] Buscando distribuição via RPC get_provider_distribution...');
   const { data: distribution, error: distError } = await supabaseAdmin
     .rpc('get_provider_distribution');
+
+  if (distError) {
+    console.warn('[Diagnostic] RPC get_provider_distribution falhou ou não existe. Usando fallback.', distError);
+  }
 
   // Fallback caso o RPC não tenha sido criado ainda
   const countMap = new Map<string, number>();
@@ -32,13 +44,16 @@ export async function selectProviderForNewContact(): Promise<EmailProvider> {
   // 3. Calcula ratio e seleciona o menor
   const candidates = activeProviders.map((config) => {
     const currentCount = countMap.get(config.provider) ?? 0;
+    const ratio = currentCount / Math.max(config.weight, 1);
+    console.log(`[Diagnostic] Provedor: ${config.provider}, Peso: ${config.weight}, Atual: ${currentCount}, Ratio: ${ratio}`);
     return {
       provider: config.provider as EmailProvider,
-      ratio: currentCount / Math.max(config.weight, 1),
+      ratio: ratio,
     };
   });
 
   candidates.sort((a, b) => a.ratio - b.ratio);
+  console.log('[Diagnostic] Vencedor selecionado:', candidates[0].provider);
   return candidates[0].provider;
 }
 

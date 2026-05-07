@@ -54,23 +54,35 @@ export async function createContact(
         : undefined,
     };
 
+    console.log('[Diagnostic] Início da criação de contato:', rawData.email);
+
     // 1. Validação
     const validated = createContactSchema.parse(rawData);
+    console.log('[Diagnostic] Dados validados com sucesso.');
 
     // 2. Verificar duplicidade via HTTPS
-    const { data: existing } = await supabase
+    console.log('[Diagnostic] Verificando se contato já existe...');
+    const { data: existing, error: checkError } = await supabase
       .from('Contact')
       .select('id')
       .eq('email', validated.email)
       .single();
 
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('[Diagnostic] Erro ao verificar duplicidade:', checkError);
+      throw new Error(`Erro de banco (check): ${checkError.message}`);
+    }
+
     let contactId = existing?.id;
 
     if (!existing) {
+      console.log('[Diagnostic] Contato novo. Selecionando provedor...');
       // 3. Selecionar provedor
       const selectedProvider = await selectProviderForNewContact();
+      console.log('[Diagnostic] Provedor selecionado:', selectedProvider);
 
       // 4. Criar contato via HTTPS
+      console.log('[Diagnostic] Inserindo contato no banco...');
       const { data: contact, error } = await supabase
         .from('Contact')
         .insert({
@@ -84,25 +96,34 @@ export async function createContact(
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Diagnostic] Erro na inserção:', error);
+        throw new Error(`Erro de banco (insert): ${error.message}`);
+      }
       contactId = contact.id;
+      console.log('[Diagnostic] Contato criado com ID:', contactId);
+    } else {
+      console.log('[Diagnostic] Contato já existente com ID:', contactId);
     }
 
     // 5. Se houver campanha selecionada, adicionar à campanha
     if (validated.campaignId && contactId) {
+      console.log('[Diagnostic] Adicionando à campanha:', validated.campaignId);
       const result = await addContactsToCampaign(validated.campaignId, [contactId]);
       if (result.error) {
-        console.error('Erro ao adicionar à campanha:', result.error);
-        // Não falhamos a criação do contato por causa disso, mas reportamos no console
+        console.error('[Diagnostic] Erro ao adicionar à campanha:', result.error);
+      } else {
+        console.log('[Diagnostic] Adicionado à campanha com sucesso.');
       }
     }
 
+    console.log('[Diagnostic] Revalidando paths...');
     revalidatePath("/contacts");
     revalidatePath("/");
 
     return { success: true, contactId };
   } catch (err) {
-    console.error('Action error (createContact):', err);
+    console.error('[Diagnostic] Erro fatal em createContact:', err);
     if (err instanceof z.ZodError) {
       return { error: (err as any).errors[0]?.message ?? "Dados inválidos." };
     }
