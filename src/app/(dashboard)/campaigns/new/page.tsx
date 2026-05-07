@@ -33,6 +33,9 @@ export default function NewCampaignPage() {
 
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [editingVariant, setEditingVariant] = useState<"A" | "B">("A");
+  
+  const [campaignName, setCampaignName] = useState("");
+  const [campaignDescription, setCampaignDescription] = useState("");
 
   const [state, formAction, isPending] = useActionState<CampaignActionState, FormData>(
     createCampaign, {}
@@ -116,11 +119,11 @@ export default function NewCampaignPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className={labelClass}>Nome da Campanha *</label>
-              <input name="name" required placeholder="Ex: Prospecção Imobiliária 2026" className={inputClass} />
+              <input name="name" required placeholder="Ex: Prospecção Imobiliária 2026" className={inputClass} value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
             </div>
             <div>
               <label className={labelClass}>Descrição</label>
-              <input name="description" placeholder="Breve descrição interna" className={inputClass} />
+              <input name="description" placeholder="Breve descrição interna" className={inputClass} value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} />
             </div>
           </div>
         </div>

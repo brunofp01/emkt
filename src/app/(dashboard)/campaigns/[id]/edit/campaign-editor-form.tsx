@@ -42,6 +42,9 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [editingVariant, setEditingVariant] = useState<"A" | "B">("A");
 
+  const [campaignName, setCampaignName] = useState(campaign.name || "");
+  const [campaignDescription, setCampaignDescription] = useState(campaign.description || "");
+
   const [state, formAction, isPending] = useActionState<CampaignActionState, FormData>(
     updateCampaign.bind(null, campaign.id), {}
   );
@@ -123,11 +126,11 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className={labelClass}>Nome da Campanha *</label>
-              <input name="name" defaultValue={campaign.name} required className={inputClass} />
+              <input name="name" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} required className={inputClass} />
             </div>
             <div>
               <label className={labelClass}>Descrição</label>
-              <input name="description" defaultValue={campaign.description || ""} className={inputClass} />
+              <input name="description" value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} className={inputClass} />
             </div>
           </div>
         </div>
