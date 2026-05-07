@@ -29,28 +29,28 @@ export default async function DashboardPage() {
         value: stats.totalContacts.toLocaleString("pt-BR"),
         icon: Users,
         color: "from-blue-500 to-indigo-600",
-        trend: "+12.5%",
+        trend: stats.growthData.length > 0 ? `+${stats.growthData[stats.growthData.length-1].count}` : "Novo",
       },
       {
-        label: "Volume de Disparos",
-        value: stats.totalSent.toLocaleString("pt-BR"),
-        icon: Mail,
-        color: "from-cyan-500 to-blue-600",
-        trend: "Estável",
-      },
-      {
-        label: "Interações Reais",
-        value: (stats.totalOpened + stats.totalClicked).toLocaleString("pt-BR"),
+        label: "Aberturas (Total)",
+        value: stats.totalOpened.toLocaleString("pt-BR"),
         icon: Zap,
         color: "from-amber-500 to-orange-600",
-        trend: "+8.2%",
+        trend: `${stats.openRate}% Rate`,
       },
       {
-        label: "Taxa de Engajamento",
+        label: "Engajamento",
         value: `${stats.openRate}%`,
         icon: TrendingUp,
         color: "from-emerald-500 to-teal-600",
         trend: "Top 5%",
+      },
+      {
+        label: "Taxa de Rejeição",
+        value: `${stats.bounceRate}%`,
+        icon: Activity,
+        color: "from-red-500 to-rose-600",
+        trend: stats.bounceRate < 5 ? "Saudável" : "Atenção",
       },
     ] as const;
 
@@ -89,7 +89,9 @@ export default async function DashboardPage() {
                   <div className={`p-2 rounded-lg bg-gradient-to-br ${card.color} shadow-lg shadow-primary-500/10`}>
                     <Icon className="h-5 w-5 text-white" />
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                    card.label === "Taxa de Rejeição" && stats.bounceRate >= 5 ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"
+                  }`}>
                     {card.trend}
                   </span>
                 </div>
@@ -106,7 +108,12 @@ export default async function DashboardPage() {
         </div>
 
         {/* Seção de Gráficos Avançados */}
-        <DashboardCharts funnelData={stats.funnelData} trendData={stats.trendData} />
+        <DashboardCharts 
+          funnelData={stats.funnelData} 
+          trendData={stats.trendData} 
+          growthData={stats.growthData}
+          campaignPerformance={stats.campaignsPerformance}
+        />
 
         {/* Terceira Linha: Distribuição e Live Feed */}
         <div className="grid gap-6 lg:grid-cols-3">
