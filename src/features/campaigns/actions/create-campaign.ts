@@ -91,7 +91,7 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
   } catch (err: any) {
     console.error('Action error (createCampaign):', err);
     if (err instanceof z.ZodError) {
-      return { error: err.errors[0]?.message ?? "Dados inválidos." };
+      return { error: err.issues[0]?.message ?? "Dados inválidos." };
     }
     return { error: err instanceof Error ? err.message : "Erro ao criar campanha." };
   }
