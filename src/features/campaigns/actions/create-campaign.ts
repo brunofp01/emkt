@@ -42,19 +42,19 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
     const campaign = await prisma.campaign.create({
       data: {
         name: validated.name,
-        description: validated.description,
+        description: validated.description || null,
         steps: {
           create: validated.steps.map(step => ({
             stepOrder: step.stepOrder,
             subject: step.subject,
             htmlBody: step.htmlBody,
-            textBody: step.textBody,
-            design: step.design,
+            textBody: step.textBody || null,
+            design: step.design || null,
             delayHours: step.delayHours,
             isABTest: step.isABTest,
-            subjectB: step.subjectB,
-            htmlBodyB: step.htmlBodyB,
-            designB: step.designB,
+            subjectB: step.subjectB || null,
+            htmlBodyB: step.htmlBodyB || null,
+            designB: step.designB || null,
           }))
         }
       }
@@ -76,7 +76,10 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
   try {
     await prisma.campaign.update({
       where: { id: campaignId },
-      data: { status: 'ACTIVE' }
+      data: { 
+        status: 'ACTIVE',
+        updatedAt: new Date()
+      }
     });
 
     revalidatePath("/campaigns");
@@ -105,7 +108,9 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
         where: {
           contactId_campaignId: { contactId, campaignId }
         },
-        update: {},
+        update: {
+          updatedAt: new Date()
+        },
         create: {
           contactId,
           campaignId,
@@ -169,7 +174,8 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
         where: { id: campaignId },
         data: {
           name: validated.name,
-          description: validated.description,
+          description: validated.description || null,
+          updatedAt: new Date(),
         }
       });
 
@@ -179,21 +185,23 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
       });
 
       // 3. Criar novas etapas
-      await tx.campaignStep.createMany({
-        data: validated.steps.map(step => ({
-          campaignId,
-          stepOrder: step.stepOrder,
-          subject: step.subject,
-          htmlBody: step.htmlBody,
-          textBody: step.textBody,
-          design: step.design,
-          delayHours: step.delayHours,
-          isABTest: step.isABTest,
-          subjectB: step.subjectB,
-          htmlBodyB: step.htmlBodyB,
-          designB: step.designB,
-        }))
-      });
+      for (const step of validated.steps) {
+        await tx.campaignStep.create({
+          data: {
+            campaignId,
+            stepOrder: step.stepOrder,
+            subject: step.subject,
+            htmlBody: step.htmlBody,
+            textBody: step.textBody || null,
+            design: step.design || null,
+            delayHours: step.delayHours,
+            isABTest: step.isABTest,
+            subjectB: step.subjectB || null,
+            htmlBodyB: step.htmlBodyB || null,
+            designB: step.designB || null,
+          }
+        });
+      }
     });
 
     revalidatePath("/campaigns");
