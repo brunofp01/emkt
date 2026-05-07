@@ -5,7 +5,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { supabase } from "@/shared/lib/supabase";
+import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
 import { selectProviderForNewContact } from "@/features/email/lib/provider-selector";
 import { addContactsToCampaign } from "@/features/campaigns/actions/create-campaign";
 

@@ -31,7 +31,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ funnelData, tr
           Funil de Conversão (Performance)
         </h2>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <FunnelChart>
               <Tooltip 
                 contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid #262626', borderRadius: '8px' }}
@@ -54,7 +54,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ funnelData, tr
           Tendência de Engajamento (7 Dias)
         </h2>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="colorSent" x1="0" y1="0" x2="0" y2="1">
