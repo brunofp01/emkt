@@ -31,12 +31,14 @@ export type CampaignActionState = { success?: boolean; error?: string; campaignI
  */
 export async function createCampaign(_prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
-    const raw = {
-      name: formData.get("name") as string,
-      description: (formData.get("description") as string) || undefined,
-      steps: JSON.parse((formData.get("steps") as string) || "[]"),
-    };
-    const validated = createCampaignSchema.parse(raw);
+    const stepsRaw = formData.get("steps") as string;
+    const name = formData.get("name") as string;
+    const description = (formData.get("description") as string) || undefined;
+
+    if (!stepsRaw) throw new Error("O campo 'steps' está ausente no FormData.");
+
+    const parsedSteps = JSON.parse(stepsRaw);
+    const validated = createCampaignSchema.parse({ name, description, steps: parsedSteps });
 
     // Criar campanha e etapas em uma única transação atômica
     const campaign = await prisma.campaign.create({
@@ -62,10 +64,16 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 
     revalidatePath("/campaigns");
     return { success: true, campaignId: campaign.id };
-  } catch (err) {
-    console.error('Action error (createCampaign):', err);
-    if (err instanceof z.ZodError) return { error: (err as any).errors[0]?.message ?? "Dados inválidos." };
-    return { error: err instanceof Error ? err.message : "Erro interno ao criar campanha." };
+  } catch (err: any) {
+    console.error('CRITICAL ACTION ERROR:', err);
+    
+    // Retornamos o erro detalhado para diagnóstico
+    const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
+    const errorStack = err instanceof Error ? err.stack : "";
+    
+    return { 
+      error: `[DIAGNOSTICO]: ${errorMessage} | STACK: ${errorStack?.slice(0, 200)}...` 
+    };
   }
 }
 
