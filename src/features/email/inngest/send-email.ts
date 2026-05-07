@@ -1,12 +1,15 @@
 /**
  * Inngest Function — Envio de email via provedor vinculado.
- * Refatorado para usar Supabase SDK (HTTPS) para estabilidade.
+ * Refatorado para usar Supabase SDK (HTTPS) e Link Tracking.
  */
 import { inngest } from "@/shared/lib/inngest";
 import { supabase } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
+import { rewriteLinks } from "@/features/email/lib/link-tracker";
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mktemail.vercel.app';
 
 export const sendEmail = inngest.createFunction(
   {
@@ -46,7 +49,7 @@ export const sendEmail = inngest.createFunction(
       return data;
     });
 
-    // Step 2: Renderizar template
+    // Step 2: Renderizar template básico
     const renderedHtml = renderTemplate(htmlBody, {
       contactName: contact.name ?? "",
       contactEmail: contact.email,
@@ -58,6 +61,15 @@ export const sendEmail = inngest.createFunction(
       contactCompany: contact.company ?? "",
     });
 
+    // Step 2b: APLICAR LINK TRACKING (Fase 2)
+    const trackedHtml = await step.run("apply-link-tracking", async () => {
+      return rewriteLinks({
+        html: renderedHtml,
+        campaignContactId,
+        baseUrl: BASE_URL
+      });
+    });
+
     // Step 3: Enviar via provedor vinculado
     const result = await step.run("send-via-provider", async () => {
       const provider = getEmailProvider(contact.provider);
@@ -66,7 +78,7 @@ export const sendEmail = inngest.createFunction(
         from: providerConfig.fromEmail,
         fromName: providerConfig.fromName,
         subject: renderedSubject,
-        html: renderedHtml,
+        html: trackedHtml, // Usando o HTML com links rastreáveis
         text: textBody,
       });
     });
