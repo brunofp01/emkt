@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { supabase } from "@/shared/lib/supabase";
+import { prisma } from "@/shared/lib/prisma";
 import { inngest } from "@/shared/lib/inngest";
 
 const campaignStepSchema = z.object({
@@ -12,7 +12,6 @@ const campaignStepSchema = z.object({
   textBody: z.string().optional(),
   design: z.any().optional(),
   delayHours: z.number().int().min(0).default(0),
-  // A/B Testing Fields
   isABTest: z.boolean().default(false),
   subjectB: z.string().optional(),
   htmlBodyB: z.string().optional(),
@@ -28,7 +27,7 @@ const createCampaignSchema = z.object({
 export type CampaignActionState = { success?: boolean; error?: string; campaignId?: string };
 
 /**
- * Cria uma nova campanha usando o SDK oficial do Supabase (HTTPS).
+ * Cria uma nova campanha usando Prisma para garantir geração de CUID e timestamps.
  */
 export async function createCampaign(_prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
@@ -39,120 +38,82 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
     };
     const validated = createCampaignSchema.parse(raw);
 
-    // 1. Criar a campanha
-    const { data: campaign, error: campaignError } = await supabase
-      .from('Campaign')
-      .insert({
+    // Criar campanha e etapas em uma única transação atômica
+    const campaign = await prisma.campaign.create({
+      data: {
         name: validated.name,
-        description: validated.description || null,
-        updatedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (campaignError) throw new Error(`Erro ao criar campanha: ${campaignError.message}`);
-
-    // 2. Criar as etapas
-    const stepsData = validated.steps.map(step => ({
-      campaignId: campaign.id,
-      stepOrder: step.stepOrder,
-      subject: step.subject,
-      htmlBody: step.htmlBody,
-      textBody: step.textBody || null,
-      design: step.design || null,
-      delayHours: step.delayHours,
-      // A/B Testing Fields
-      isABTest: step.isABTest,
-      subjectB: step.subjectB || null,
-      htmlBodyB: step.htmlBodyB || null,
-      designB: step.designB || null,
-      updatedAt: new Date().toISOString(),
-    }));
-
-    const { error: stepsError } = await supabase
-      .from('CampaignStep')
-      .insert(stepsData);
-
-    if (stepsError) throw new Error(`Erro ao criar etapas: ${stepsError.message}`);
+        description: validated.description,
+        steps: {
+          create: validated.steps.map(step => ({
+            stepOrder: step.stepOrder,
+            subject: step.subject,
+            htmlBody: step.htmlBody,
+            textBody: step.textBody,
+            design: step.design,
+            delayHours: step.delayHours,
+            isABTest: step.isABTest,
+            subjectB: step.subjectB,
+            htmlBodyB: step.htmlBodyB,
+            designB: step.designB,
+          }))
+        }
+      }
+    });
 
     revalidatePath("/campaigns");
     return { success: true, campaignId: campaign.id };
   } catch (err) {
     console.error('Action error (createCampaign):', err);
     if (err instanceof z.ZodError) return { error: (err as any).errors[0]?.message ?? "Dados inválidos." };
-    return { error: err instanceof Error ? err.message : "Erro ao criar campanha." };
+    return { error: err instanceof Error ? err.message : "Erro interno ao criar campanha." };
   }
 }
 
 /**
- * Ativa uma campanha via HTTPS.
+ * Ativa uma campanha.
  */
 export async function activateCampaign(campaignId: string): Promise<CampaignActionState> {
   try {
-    const { error } = await supabase
-      .from('Campaign')
-      .update({ 
-        status: 'ACTIVE',
-        updatedAt: new Date().toISOString() 
-      })
-      .eq('id', campaignId);
-
-    if (error) throw error;
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'ACTIVE' }
+    });
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);
     return { success: true };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erro." };
+    return { error: err instanceof Error ? err.message : "Erro ao ativar." };
   }
 }
 
 /**
- * Adiciona contatos a uma campanha e inicia o fluxo no Inngest via HTTPS.
+ * Adiciona contatos e inicia o fluxo.
  */
 export async function addContactsToCampaign(campaignId: string, contactIds: string[]): Promise<CampaignActionState> {
   try {
-    // Buscar a primeira etapa da campanha
-    const { data: steps, error: stepError } = await supabase
-      .from('CampaignStep')
-      .select('*')
-      .eq('campaignId', campaignId)
-      .order('stepOrder', { ascending: true })
-      .limit(1);
+    const firstStep = await prisma.campaignStep.findFirst({
+      where: { campaignId },
+      orderBy: { stepOrder: 'asc' }
+    });
 
-    if (stepError) throw stepError;
-    const firstStep = steps?.[0];
-    if (!firstStep) return { error: "Campanha sem etapas definidas." };
+    if (!firstStep) return { error: "Campanha sem etapas." };
 
     for (const contactId of contactIds) {
-      // Verificar se já existe vínculo
-      const { data: existing } = await supabase
-        .from('CampaignContact')
-        .select('id')
-        .match({ contactId, campaignId })
-        .single();
+      // Upsert para evitar duplicidade e garantir vínculo
+      const cc = await prisma.campaignContact.upsert({
+        where: {
+          contactId_campaignId: { contactId, campaignId }
+        },
+        update: {},
+        create: {
+          contactId,
+          campaignId,
+          currentStepId: firstStep.id,
+          stepStatus: "QUEUED"
+        }
+      });
 
-      if (existing) continue;
-
-      // Criar o vínculo
-      const { data: cc, error: ccError } = await supabase
-        .from('CampaignContact')
-        .insert({ 
-          contactId, 
-          campaignId, 
-          currentStepId: firstStep.id, 
-          stepStatus: "QUEUED",
-          updatedAt: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (ccError) {
-        console.error(`Erro ao vincular contato ${contactId}:`, ccError);
-        continue;
-      }
-
-      // Disparar envio via Inngest
       await inngest.send({
         name: "email/send",
         data: {
@@ -174,27 +135,24 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
 }
 
 /**
- * Exclui uma campanha via HTTPS.
+ * Exclui uma campanha.
  */
 export async function deleteCampaign(campaignId: string): Promise<CampaignActionState> {
   try {
-    const { error } = await supabase
-      .from('Campaign')
-      .delete()
-      .eq('id', campaignId);
-
-    if (error) throw error;
+    await prisma.campaign.delete({
+      where: { id: campaignId }
+    });
 
     revalidatePath("/campaigns");
     return { success: true };
   } catch (err) {
     console.error('Action error (deleteCampaign):', err);
-    return { error: err instanceof Error ? err.message : "Erro ao excluir campanha." };
+    return { error: err instanceof Error ? err.message : "Erro ao excluir." };
   }
 }
 
 /**
- * Atualiza uma campanha existente via HTTPS.
+ * Atualiza uma campanha e sincroniza etapas.
  */
 export async function updateCampaign(campaignId: string, _prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
@@ -205,54 +163,44 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
     };
     const validated = createCampaignSchema.parse(raw);
 
-    // 1. Atualizar dados básicos da campanha
-    const { error: campaignError } = await supabase
-      .from('Campaign')
-      .update({
-        name: validated.name,
-        description: validated.description || null,
-        updatedAt: new Date().toISOString(),
-      })
-      .eq('id', campaignId);
+    await prisma.$transaction(async (tx) => {
+      // 1. Atualizar dados básicos
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: {
+          name: validated.name,
+          description: validated.description,
+        }
+      });
 
-    if (campaignError) throw new Error(`Erro ao atualizar campanha: ${campaignError.message}`);
+      // 2. Limpar etapas antigas
+      await tx.campaignStep.deleteMany({
+        where: { campaignId }
+      });
 
-    // 2. Atualizar etapas (Estratégia: Deletar e Reinserir para simplificar ordem)
-    // Nota: Em produção real, deveríamos atualizar por ID para evitar quebra de CampaignContact
-    const { error: deleteError } = await supabase
-      .from('CampaignStep')
-      .delete()
-      .eq('campaignId', campaignId);
-
-    if (deleteError) throw new Error(`Erro ao limpar etapas antigas: ${deleteError.message}`);
-
-    const stepsData = validated.steps.map(step => ({
-      campaignId,
-      stepOrder: step.stepOrder,
-      subject: step.subject,
-      htmlBody: step.htmlBody,
-      textBody: step.textBody || null,
-      design: step.design || null,
-      delayHours: step.delayHours,
-      isABTest: step.isABTest,
-      subjectB: step.subjectB || null,
-      htmlBodyB: step.htmlBodyB || null,
-      designB: step.designB || null,
-      updatedAt: new Date().toISOString(),
-    }));
-
-    const { error: stepsError } = await supabase
-      .from('CampaignStep')
-      .insert(stepsData);
-
-    if (stepsError) throw new Error(`Erro ao atualizar etapas: ${stepsError.message}`);
+      // 3. Criar novas etapas
+      await tx.campaignStep.createMany({
+        data: validated.steps.map(step => ({
+          campaignId,
+          stepOrder: step.stepOrder,
+          subject: step.subject,
+          htmlBody: step.htmlBody,
+          textBody: step.textBody,
+          design: step.design,
+          delayHours: step.delayHours,
+          isABTest: step.isABTest,
+          subjectB: step.subjectB,
+          htmlBodyB: step.htmlBodyB,
+          designB: step.designB,
+        }))
+      });
+    });
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);
     return { success: true };
   } catch (err) {
     console.error('Action error (updateCampaign):', err);
-    if (err instanceof z.ZodError) return { error: (err as any).errors[0]?.message ?? "Dados inválidos." };
-    return { error: err instanceof Error ? err.message : "Erro ao atualizar campanha." };
+    return { error: err instanceof Error ? err.message : "Erro ao atualizar." };
   }
 }
