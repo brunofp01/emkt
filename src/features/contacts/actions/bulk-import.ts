@@ -25,7 +25,11 @@ export async function bulkImportContacts(contacts: ImportContact[], campaignId?:
     // 2. Preparar dados para o Supabase
     // Usamos 'onConflict' para ignorar duplicatas ou atualizar se necessário.
     // Aqui vamos apenas ignorar (do nothing) para manter a integridade do provedor original se já existir.
+    const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const now = new Date().toISOString();
+
     const dataToInsert = contacts.map(c => ({
+      id: generateId(),
       email: c.email.toLowerCase().trim(),
       name: c.name || null,
       company: c.company || null,
@@ -33,6 +37,7 @@ export async function bulkImportContacts(contacts: ImportContact[], campaignId?:
       tags: c.tags || [],
       provider: selectedProvider,
       status: 'ACTIVE',
+      updatedAt: now,
     }));
 
     const { error: upsertError } = await supabaseAdmin

@@ -9,6 +9,12 @@ import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
 import { selectProviderForNewContact } from "@/features/email/lib/provider-selector";
 import { addContactsToCampaign } from "@/features/campaigns/actions/create-campaign";
 
+/**
+ * Função simples para gerar um ID compatível com o campo String (cuid) do Prisma.
+ * Usado para inserções diretas via Supabase SDK.
+ */
+const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
 /** Schema de validação para criação de contato */
 const createContactSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -83,15 +89,18 @@ export async function createContact(
 
       // 4. Criar contato via HTTPS
       console.log('[Diagnostic] Inserindo contato no banco...');
+      const contactIdToInsert = generateId();
       const { data: contact, error } = await supabase
         .from('Contact')
         .insert({
+          id: contactIdToInsert,
           email: validated.email,
           name: validated.name,
           company: validated.company,
           phone: validated.phone,
           tags: validated.tags ?? [],
           provider: selectedProvider,
+          updatedAt: new Date().toISOString(),
         })
         .select()
         .single();
@@ -161,6 +170,7 @@ export async function updateContact(
         phone: validated.phone,
         status: validated.status,
         tags: validated.tags,
+        updatedAt: new Date().toISOString(),
       })
       .eq('id', validated.id);
 
