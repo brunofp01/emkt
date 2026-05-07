@@ -7,6 +7,7 @@ import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
 import { rewriteLinks } from "@/features/email/lib/link-tracker";
+import { logger } from "@/shared/lib/logger";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mktemail.vercel.app';
 
@@ -105,6 +106,7 @@ export const sendEmail = inngest.createFunction(
     });
 
     if (!result.success) {
+      logger.error(`Falha no envio via ${contact.provider}`, result.error, { contactId, campaignContactId });
       throw new Error(`Falha no envio via ${contact.provider}: ${result.error}`);
     }
 
