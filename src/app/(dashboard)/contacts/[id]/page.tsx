@@ -50,7 +50,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
             <p className="text-sm text-surface-500">Nenhuma campanha associada.</p>
           ) : (
             <div className="space-y-3">
-              {contact.campaignContacts.map((cc) => (
+              {(contact.campaignContacts || []).map((cc: any) => (
                 <div key={cc.id} className="rounded-lg border border-surface-800/50 bg-surface-900/30 p-3">
                   <p className="font-medium text-surface-200">{cc.campaign.name}</p>
                   <div className="mt-1 flex items-center gap-2 text-xs text-surface-500">
@@ -74,7 +74,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
           ) : (
             <div className="relative space-y-0">
               <div className="absolute left-3 top-0 h-full w-px bg-surface-800" />
-              {contact.emailEvents.map((event) => {
+              {(contact.emailEvents || []).map((event: any) => {
                 const color = EVENT_TYPE_COLORS[event.eventType as keyof typeof EVENT_TYPE_COLORS] ?? "#6b7280";
                 const label = EVENT_TYPE_LABELS[event.eventType as keyof typeof EVENT_TYPE_LABELS] ?? event.eventType;
                 return (
