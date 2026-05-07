@@ -1,13 +1,11 @@
 /**
- * Server Actions — CRUD de contatos.
- * 
- * Inclui a lógica de vínculo automático de provedor no cadastro.
+ * Server Actions — CRUD de contatos usando Supabase SDK (HTTPS).
  */
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/shared/lib/prisma";
+import { supabase } from "@/shared/lib/supabase";
 import { selectProviderForNewContact } from "@/features/email/lib/provider-selector";
 
 /** Schema de validação para criação de contato */
@@ -21,7 +19,7 @@ const createContactSchema = z.object({
 
 /** Schema de validação para atualização de contato */
 const updateContactSchema = z.object({
-  id: z.string().cuid(),
+  id: z.string(),
   name: z.string().optional(),
   company: z.string().optional(),
   phone: z.string().optional(),
@@ -36,13 +34,7 @@ export type CreateContactState = {
 };
 
 /**
- * Cria um novo contato e vincula automaticamente um provedor de email.
- * 
- * Fluxo:
- * 1. Valida os dados de entrada com Zod
- * 2. Verifica se o email já existe
- * 3. Seleciona o provedor via weighted round-robin
- * 4. Cria o contato com provedor permanentemente vinculado
+ * Cria um novo contato via HTTPS.
  */
 export async function createContact(
   _prevState: CreateContactState,
@@ -62,34 +54,42 @@ export async function createContact(
     // 1. Validação
     const validated = createContactSchema.parse(rawData);
 
-    // 2. Verificar duplicidade
-    const existing = await prisma.contact.findUnique({
-      where: { email: validated.email },
-    });
+    // 2. Verificar duplicidade via HTTPS
+    const { data: existing } = await supabase
+      .from('Contact')
+      .select('id')
+      .eq('email', validated.email)
+      .single();
+
     if (existing) {
       return { error: "Este email já está cadastrado." };
     }
 
-    // 3. Selecionar provedor (CHAVE do sistema)
+    // 3. Selecionar provedor
     const selectedProvider = await selectProviderForNewContact();
 
-    // 4. Criar contato com provedor vinculado
-    const contact = await prisma.contact.create({
-      data: {
+    // 4. Criar contato via HTTPS
+    const { data: contact, error } = await supabase
+      .from('Contact')
+      .insert({
         email: validated.email,
         name: validated.name,
         company: validated.company,
         phone: validated.phone,
         tags: validated.tags ?? [],
         provider: selectedProvider,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
 
     revalidatePath("/contacts");
     revalidatePath("/");
 
     return { success: true, contactId: contact.id };
   } catch (err) {
+    console.error('Action error (createContact):', err);
     if (err instanceof z.ZodError) {
       return { error: (err as any).errors[0]?.message ?? "Dados inválidos." };
     }
@@ -99,8 +99,7 @@ export async function createContact(
 }
 
 /**
- * Atualiza um contato existente.
- * O provedor NÃO pode ser alterado (regra de negócio).
+ * Atualiza um contato via HTTPS.
  */
 export async function updateContact(
   _prevState: CreateContactState,
@@ -120,16 +119,18 @@ export async function updateContact(
 
     const validated = updateContactSchema.parse(rawData);
 
-    await prisma.contact.update({
-      where: { id: validated.id },
-      data: {
+    const { error } = await supabase
+      .from('Contact')
+      .update({
         name: validated.name,
         company: validated.company,
         phone: validated.phone,
         status: validated.status,
         tags: validated.tags,
-      },
-    });
+      })
+      .eq('id', validated.id);
+
+    if (error) throw error;
 
     revalidatePath("/contacts");
     revalidatePath(`/contacts/${validated.id}`);
@@ -145,13 +146,16 @@ export async function updateContact(
 }
 
 /**
- * Remove um contato e todos os seus dados relacionados.
+ * Remove um contato via HTTPS.
  */
 export async function deleteContact(contactId: string): Promise<CreateContactState> {
   try {
-    await prisma.contact.delete({
-      where: { id: contactId },
-    });
+    const { error } = await supabase
+      .from('Contact')
+      .delete()
+      .eq('id', contactId);
+
+    if (error) throw error;
 
     revalidatePath("/contacts");
     revalidatePath("/");

@@ -1,12 +1,9 @@
-// @ts-nocheck
 /**
  * Inngest Function — Envio de email via provedor vinculado.
- * 
- * Disparada pelo evento "email/send". Busca o contato, determina o provedor
- * vinculado e envia o email. Retries automáticos (3x) pelo mesmo provedor.
+ * Refatorado para usar Supabase SDK (HTTPS) para estabilidade.
  */
 import { inngest } from "@/shared/lib/inngest";
-import { prisma } from "@/shared/lib/prisma";
+import { supabase } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
@@ -27,15 +24,26 @@ export const sendEmail = inngest.createFunction(
       textBody?: string;
     };
 
-    // Step 1: Buscar contato e config do provedor
+    // Step 1: Buscar contato via HTTPS
     const contact = await step.run("fetch-contact", async () => {
-      return prisma.contact.findUniqueOrThrow({ where: { id: contactId } });
+      const { data, error } = await supabase
+        .from('Contact')
+        .select('*')
+        .eq('id', contactId)
+        .single();
+      if (error) throw error;
+      return data;
     });
 
+    // Step 1b: Buscar config do provedor via HTTPS
     const providerConfig = await step.run("fetch-provider-config", async () => {
-      return prisma.providerConfig.findUniqueOrThrow({
-        where: { provider: contact.provider },
-      });
+      const { data, error } = await supabase
+        .from('ProviderConfig')
+        .select('*')
+        .eq('provider', contact.provider)
+        .single();
+      if (error) throw error;
+      return data;
     });
 
     // Step 2: Renderizar template
@@ -67,16 +75,19 @@ export const sendEmail = inngest.createFunction(
       throw new Error(`Falha no envio via ${contact.provider}: ${result.error}`);
     }
 
-    // Step 4: Atualizar CampaignContact com messageId
+    // Step 4: Atualizar CampaignContact com messageId via HTTPS
     await step.run("update-campaign-contact", async () => {
-      await prisma.campaignContact.update({
-        where: { id: campaignContactId },
-        data: {
+      const { error } = await supabase
+        .from('CampaignContact')
+        .update({
           stepStatus: "SENT",
           lastMessageId: result.messageId,
-          lastSentAt: new Date(),
-        },
-      });
+          lastSentAt: new Date().toISOString(),
+        })
+        .eq('id', campaignContactId);
+      
+      if (error) throw error;
+      
       await incrementProviderSendCount(contact.provider);
     });
 
