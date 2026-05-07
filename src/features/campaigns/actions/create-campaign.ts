@@ -12,6 +12,11 @@ const campaignStepSchema = z.object({
   textBody: z.string().optional(),
   design: z.any().optional(),
   delayHours: z.number().int().min(0).default(0),
+  // A/B Testing Fields
+  isABTest: z.boolean().default(false),
+  subjectB: z.string().optional(),
+  htmlBodyB: z.string().optional(),
+  designB: z.any().optional(),
 });
 
 const createCampaignSchema = z.object({
@@ -55,6 +60,11 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
       textBody: step.textBody,
       design: step.design,
       delayHours: step.delayHours,
+      // A/B Testing Fields
+      isABTest: step.isABTest,
+      subjectB: step.subjectB || null,
+      htmlBodyB: step.htmlBodyB || null,
+      designB: step.designB || null,
     }));
 
     const { error: stepsError } = await supabase

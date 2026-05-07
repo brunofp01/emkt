@@ -117,6 +117,13 @@ model CampaignStep {
   htmlBody   String @db.Text
   textBody   String? @db.Text
   design     Json?
+
+  // A/B Testing Fields
+  isABTest   Boolean @default(false)
+  subjectB   String?
+  htmlBodyB  String? @db.Text
+  designB    Json?
+
   conditions Json?
   delayHours Int    @default(0)
 
@@ -138,6 +145,7 @@ model CampaignContact {
   campaignId    String
   currentStepId String?
   stepStatus    SequenceStepStatus @default(PENDING)
+  abVariant     String?            // "A" ou "B"
   isPaused      Boolean            @default(false)
   lastMessageId String?
   lastSentAt    DateTime?

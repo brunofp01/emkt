@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Filter, Tag, Search } from "lucide-react";
 import { ContactForm } from "./contact-form";
 import { ContactTableRow } from "./contact-table-row";
@@ -40,6 +40,18 @@ export function ContactTable({ contacts, total, page, totalPages }: ContactTable
   const currentTag = searchParams.get('tag') || "";
   const currentSearch = searchParams.get('search') || "";
 
+  const [searchTerm, setSearchTerm] = useState(currentSearch);
+
+  // Debounce logic (400ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm !== currentSearch) {
+        handleFilterChange('search', searchTerm);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) {
@@ -47,7 +59,7 @@ export function ContactTable({ contacts, total, page, totalPages }: ContactTable
     } else {
       params.delete(key);
     }
-    params.set('page', '1'); // Reset to page 1 on filter
+    params.set('page', '1');
     router.push(`?${params.toString()}`);
   };
 
@@ -63,9 +75,8 @@ export function ContactTable({ contacts, total, page, totalPages }: ContactTable
             <input 
               type="text"
               placeholder="Buscar por email, nome ou empresa..."
-              defaultValue={currentSearch}
-              onBlur={(e) => handleFilterChange('search', e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleFilterChange('search', (e.target as HTMLInputElement).value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-surface-900 border border-surface-800 rounded-lg text-sm text-surface-200 focus:outline-none focus:border-primary-500/50"
             />
           </div>

@@ -26,36 +26,53 @@ export const sendEmail = inngest.createFunction(
       textBody?: string;
     };
 
-    // 1. Buscar contato e configurações (Bypass RLS para velocidade e segurança)
-    const { contact, providerConfig } = await step.run("fetch-requirements", async () => {
+    // 1. Buscar contato, etapa e configurações (Hardened)
+    const { contact, campaignContact, stepConfig, providerConfig } = await step.run("fetch-requirements", async () => {
       const [{ data: contact }, { data: campaignContact }] = await Promise.all([
         supabaseAdmin.from('Contact').select('*').eq('id', contactId).single(),
-        supabaseAdmin.from('CampaignContact').select('isPaused, stepStatus').eq('id', campaignContactId).single()
+        supabaseAdmin.from('CampaignContact').select('isPaused, stepStatus, abVariant, currentStepId').eq('id', campaignContactId).single()
       ]);
 
-      if (!contact) throw new Error("Contact not found");
+      if (!contact || !campaignContact) throw new Error("Contact or CampaignContact not found");
       
       // Validação de segurança/entregabilidade
       if (contact.status !== 'ACTIVE') {
         return { skipped: true, reason: `Contact status is ${contact.status}` };
       }
 
-      if (!campaignContact || campaignContact.isPaused || campaignContact.stepStatus === 'UNSUBSCRIBED') {
-        return { skipped: true, reason: "Campaign contact is invalid or paused" };
-      }
+      const [{ data: stepData }, { data: config }] = await Promise.all([
+        supabaseAdmin.from('CampaignStep').select('*').eq('id', campaignContact.currentStepId).single(),
+        supabaseAdmin.from('ProviderConfig').select('*').eq('provider', contact.provider).single()
+      ]);
 
-      const { data: config } = await supabaseAdmin
-        .from('ProviderConfig')
-        .select('*')
-        .eq('provider', contact.provider)
-        .single();
-
-      return { contact, providerConfig: config };
+      return { contact, campaignContact, stepConfig: stepData, providerConfig: config };
     }) as any;
 
     if (contact?.skipped) return contact;
 
     // 2. Renderização e Tracking
+    // 1b. Lógica de A/B Testing (Fase 7)
+    let selectedSubject = subject;
+    let selectedHtml = htmlBody;
+
+    if (stepConfig.isABTest) {
+      let variant = campaignContact.abVariant;
+      
+      if (!variant) {
+        variant = Math.random() > 0.5 ? "B" : "A";
+        await supabaseAdmin
+          .from('CampaignContact')
+          .update({ abVariant: variant })
+          .eq('id', campaignContactId);
+      }
+
+      if (variant === "B" && stepConfig.htmlBodyB) {
+        selectedSubject = stepConfig.subjectB || subject;
+        selectedHtml = stepConfig.htmlBodyB;
+      }
+    }
+
+    // 2. Renderização Final de Variáveis
     const templateVars = {
       contactId: contact.id,
       contactName: contact.name ?? "",
@@ -63,8 +80,8 @@ export const sendEmail = inngest.createFunction(
       contactCompany: contact.company ?? "",
     };
 
-    const renderedHtml = renderTemplate(htmlBody, templateVars);
-    const renderedSubject = renderTemplate(subject, templateVars);
+    const renderedSubject = renderTemplate(selectedSubject, templateVars);
+    const renderedHtml = renderTemplate(selectedHtml, templateVars);
 
     const trackedHtml = await step.run("apply-link-tracking", async () => {
       return rewriteLinks({
