@@ -1,6 +1,6 @@
 /**
  * Contact queries — Busca de contatos usando o SDK oficial do Supabase.
- * Refatorado para máxima estabilidade em ambiente Serverless (Vercel).
+ * Refatorado para máxima estabilidade e Segmentação Dinâmica (Fase 6).
  */
 import { supabase } from "@/shared/lib/supabase";
 import type { EmailProvider, ContactStatus } from "@prisma/client";
@@ -9,6 +9,7 @@ export interface ContactFilters {
   search?: string;
   provider?: EmailProvider;
   status?: ContactStatus;
+  tag?: string;
   page?: number;
   perPage?: number;
 }
@@ -16,13 +17,14 @@ export interface ContactFilters {
 const DEFAULT_PER_PAGE = 20;
 
 /**
- * Lista contatos com filtros, paginação e busca via HTTPS.
+ * Lista contatos com filtros, paginação e Segmentação Dinâmica via HTTPS.
  */
 export async function getContacts(filters: ContactFilters = {}) {
   const {
     search,
     provider,
     status,
+    tag,
     page = 1,
     perPage = DEFAULT_PER_PAGE,
   } = filters;
@@ -39,6 +41,11 @@ export async function getContacts(filters: ContactFilters = {}) {
 
   if (status) {
     query = query.eq('status', status);
+  }
+
+  // Segmentação Dinâmica: Filtro por Tags (Postgres Array Contains)
+  if (tag) {
+    query = query.contains('tags', [tag]);
   }
 
   const start = (page - 1) * perPage;

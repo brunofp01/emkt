@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PROVIDER_LABELS, PROVIDER_COLORS, STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
+import { Tag } from "lucide-react";
 
 interface ContactTableRowProps {
   contact: {
@@ -11,6 +12,7 @@ interface ContactTableRowProps {
     company: string | null;
     provider: string;
     status: string;
+    tags: string[];
     createdAt: Date;
     campaignContacts: Array<{
       campaign: { name: string };
@@ -33,6 +35,14 @@ export function ContactTableRow({ contact }: ContactTableRowProps) {
         <Link href={`/contacts/${contact.id}`} className="text-sm font-medium text-primary-400 hover:text-primary-300 hover:underline block truncate max-w-[120px] sm:max-w-none">
           {contact.email}
         </Link>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {contact.tags?.map(tag => (
+            <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400 border border-primary-500/20 text-[9px] font-bold uppercase tracking-wider">
+              <Tag className="h-2 w-2" />
+              {tag}
+            </span>
+          ))}
+        </div>
       </td>
       <td className="hidden px-6 py-3 md:table-cell">
         <div>

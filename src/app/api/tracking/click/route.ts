@@ -32,7 +32,22 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (!ccError && cc) {
-      // 3. Registrar o evento de CLICK via HTTPS
+      // 3. Atualizar Tags do Contato (Segmentação Automática)
+      const { data: contact } = await supabase
+        .from('Contact')
+        .select('tags')
+        .eq('id', cc.contactId)
+        .single();
+      
+      const currentTags = contact?.tags || [];
+      if (!currentTags.includes('CLICKED')) {
+        await supabase
+          .from('Contact')
+          .update({ tags: [...currentTags, 'CLICKED'] })
+          .eq('id', cc.contactId);
+      }
+
+      // 4. Registrar o evento de CLICK via HTTPS
       await supabase.from('EmailEvent').insert({
         contactId: cc.contactId,
         messageId: cc.lastMessageId || 'direct-click',
