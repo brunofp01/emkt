@@ -20,44 +20,60 @@ interface CampaignDetailPageProps {
 async function getStepMetrics(campaignId: string, steps: any[], totalContacts: number) {
   if (totalContacts === 0 || steps.length === 0) return [];
 
-  // Buscar todos os CampaignContacts com seus status e etapa atual
+// Buscar todos os CampaignContacts com seus status e etapa atual
   const { data: contacts } = await supabaseAdmin
     .from('CampaignContact')
-    .select('currentStepId, stepStatus')
+    .select('contactId, currentStepId, stepStatus, abVariant')
     .eq('campaignId', campaignId);
 
-  // Buscar todos os eventos de contatos nesta campanha
-  const { data: ccList } = await supabaseAdmin
-    .from('CampaignContact')
-    .select('contactId')
-    .eq('campaignId', campaignId);
-
-  const contactIds = ccList?.map(c => c.contactId) || [];
+  const contactIds = contacts?.map(c => c.contactId) || [];
   
   let events: any[] = [];
   if (contactIds.length > 0) {
     const { data } = await supabaseAdmin
       .from('EmailEvent')
-      .select('eventType')
+      .select('contactId, eventType')
       .in('contactId', contactIds);
     events = data || [];
   }
 
-  // Contar eventos globais
-  const sentCount = events.filter(e => e.eventType === 'SENT' || e.eventType === 'DELIVERED').length;
-  const deliveredCount = events.filter(e => e.eventType === 'DELIVERED').length;
-  const openedCount = events.filter(e => e.eventType === 'OPENED').length;
-  const clickedCount = events.filter(e => e.eventType === 'CLICKED').length;
+  const eventsByContact = new Map();
+  events.forEach(e => {
+    if (!eventsByContact.has(e.contactId)) eventsByContact.set(e.contactId, []);
+    eventsByContact.get(e.contactId).push(e.eventType);
+  });
 
   // Calcular métricas por etapa
   return steps.map((step: any) => {
-    // Contatos que já passaram por esta etapa ou estão nela
-    const contactsInStep = contacts?.filter(c => c.currentStepId === step.id) || [];
-    const atThisStep = contactsInStep.length;
-    
-    // Para a primeira etapa, usamos métricas globais (simplificação eficiente)
     const isFirstStep = step.stepOrder === 1;
+    const contactsInStep = contacts?.filter(c => c.currentStepId === step.id) || [];
     
+    let variantA = { sent: 0, delivered: 0, opened: 0, total: 0 };
+    let variantB = { sent: 0, delivered: 0, opened: 0, total: 0 };
+
+    if (isFirstStep) {
+      contacts?.forEach(c => {
+        const evts = eventsByContact.get(c.contactId) || [];
+        const isB = c.abVariant === 'B';
+        const target = isB ? variantB : variantA;
+        
+        target.total += 1;
+        if (evts.includes('SENT') || evts.includes('DELIVERED')) target.sent += 1;
+        if (evts.includes('DELIVERED')) target.delivered += 1;
+        if (evts.includes('OPENED') || evts.includes('CLICKED')) target.opened += 1;
+      });
+    } else {
+      contactsInStep.forEach(c => {
+        const isB = c.abVariant === 'B';
+        const target = isB ? variantB : variantA;
+        
+        target.total += 1;
+        target.sent += 1;
+        target.delivered += 1; // estimate
+        if (['OPENED', 'CLICKED'].includes(c.stepStatus)) target.opened += 1;
+      });
+    }
+
     return {
       stepId: step.id,
       stepOrder: step.stepOrder,
@@ -65,15 +81,12 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       subjectB: step.subjectB,
       isABTest: step.isABTest,
       delayHours: step.delayHours,
-      sent: isFirstStep ? sentCount : atThisStep,
-      delivered: isFirstStep ? deliveredCount : Math.floor(atThisStep * 0.95),
-      opened: isFirstStep ? openedCount : contactsInStep.filter((c: any) => 
-        ['OPENED', 'CLICKED'].includes(c.stepStatus)
-      ).length,
-      clicked: isFirstStep ? clickedCount : contactsInStep.filter((c: any) => 
-        c.stepStatus === 'CLICKED'
-      ).length,
       total: totalContacts,
+      sent: variantA.sent + variantB.sent,
+      delivered: variantA.delivered + variantB.delivered,
+      opened: variantA.opened + variantB.opened,
+      variantA,
+      variantB
     };
   });
 }
@@ -181,54 +194,121 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {/* Barra de Envio */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
-                        <Send className="h-3 w-3 text-blue-400" /> Enviados
-                      </span>
-                      <span className="text-[10px] font-mono text-surface-400">{metric.sent}/{metric.total} ({sentPct}%)</span>
-                    </div>
-                    <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-blue-500 rounded-full transition-all duration-1000" 
-                        style={{ width: `${sentPct}%`, boxShadow: '0 0 8px rgba(59, 130, 246, 0.3)' }} 
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-4">
+                  {!metric.isABTest ? (
+                    <>
+                      {/* Barra de Envio (Simples) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
+                            <Send className="h-3 w-3 text-blue-400" /> Enviados
+                          </span>
+                          <span className="text-[10px] font-mono text-surface-400">{metric.sent}/{metric.total} ({sentPct}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${sentPct}%`, boxShadow: '0 0 8px rgba(59, 130, 246, 0.3)' }} />
+                        </div>
+                      </div>
 
-                  {/* Barra de Entrega */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Entregues
-                      </span>
-                      <span className="text-[10px] font-mono text-surface-400">{metric.delivered}/{metric.total} ({deliveredPct}%)</span>
-                    </div>
-                    <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
-                        style={{ width: `${deliveredPct}%`, boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)' }} 
-                      />
-                    </div>
-                  </div>
+                      {/* Barra de Entrega (Simples) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Entregues
+                          </span>
+                          <span className="text-[10px] font-mono text-surface-400">{metric.delivered}/{metric.total} ({deliveredPct}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${deliveredPct}%`, boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)' }} />
+                        </div>
+                      </div>
 
-                  {/* Barra de Abertura */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
-                        <Eye className="h-3 w-3 text-amber-400" /> Aberturas
-                      </span>
-                      <span className="text-[10px] font-mono text-surface-400">{metric.opened}/{metric.total} ({openedPct}%)</span>
+                      {/* Barra de Abertura (Simples) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
+                            <Eye className="h-3 w-3 text-amber-400" /> Aberturas
+                          </span>
+                          <span className="text-[10px] font-mono text-surface-400">{metric.opened}/{metric.total} ({openedPct}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${openedPct}%`, boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)' }} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-6 pt-2 border-t border-surface-800/50 mt-4">
+                      {/* Variante A */}
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary-500 mb-2">Métricas Variante A</h4>
+                        {(() => {
+                          const vSentPct = metric.variantA.total > 0 ? Math.round((metric.variantA.sent / metric.variantA.total) * 100) : 0;
+                          const vDelPct = metric.variantA.total > 0 ? Math.round((metric.variantA.delivered / metric.variantA.total) * 100) : 0;
+                          const vOpnPct = metric.variantA.total > 0 ? Math.round((metric.variantA.opened / metric.variantA.total) * 100) : 0;
+                          return (
+                            <>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Enviados</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantA.sent}/{metric.variantA.total} ({vSentPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${vSentPct}%` }} /></div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Entregues</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantA.delivered}/{metric.variantA.total} ({vDelPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${vDelPct}%` }} /></div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Aberturas</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantA.opened}/{metric.variantA.total} ({vOpnPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${vOpnPct}%` }} /></div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Variante B */}
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-2">Métricas Variante B</h4>
+                        {(() => {
+                          const vSentPct = metric.variantB.total > 0 ? Math.round((metric.variantB.sent / metric.variantB.total) * 100) : 0;
+                          const vDelPct = metric.variantB.total > 0 ? Math.round((metric.variantB.delivered / metric.variantB.total) * 100) : 0;
+                          const vOpnPct = metric.variantB.total > 0 ? Math.round((metric.variantB.opened / metric.variantB.total) * 100) : 0;
+                          return (
+                            <>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Enviados</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantB.sent}/{metric.variantB.total} ({vSentPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${vSentPct}%` }} /></div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Entregues</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantB.delivered}/{metric.variantB.total} ({vDelPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${vDelPct}%` }} /></div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[9px] uppercase text-surface-500">Aberturas</span>
+                                  <span className="text-[9px] font-mono text-surface-400">{metric.variantB.opened}/{metric.variantB.total} ({vOpnPct}%)</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-surface-800 rounded-full"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${vOpnPct}%` }} /></div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
-                    <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-amber-500 rounded-full transition-all duration-1000" 
-                        style={{ width: `${openedPct}%`, boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)' }} 
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             );
