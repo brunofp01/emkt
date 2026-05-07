@@ -3,7 +3,7 @@
  * Refatorado para usar Supabase SDK (HTTPS).
  */
 import { inngest } from "@/shared/lib/inngest";
-import { supabase } from "@/shared/lib/supabase";
+import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
 
 export const processSequence = inngest.createFunction(
   {
@@ -16,10 +16,12 @@ export const processSequence = inngest.createFunction(
     ],
   },
   async ({ event, step }) => {
-    const { messageId } = event.data as { messageId: string };
+    const { contactId, campaignContactId } = event.data as { contactId: string; campaignContactId: string };
     const eventType = event.name === "email/clicked" ? "CLICKED" : "OPENED";
 
-    // Step 1: Buscar CampaignContact pelo messageId via HTTPS
+    if (!campaignContactId) return { skipped: true, reason: "No campaignContactId in event" };
+
+    // Step 1: Buscar CampaignContact pelo ID direto via HTTPS (Admin)
     const campaignContact = await step.run("find-campaign-contact", async () => {
       const { data, error } = await supabase
         .from('CampaignContact')
@@ -32,7 +34,7 @@ export const processSequence = inngest.createFunction(
           currentStep:CampaignStep(*),
           contact:Contact(*)
         `)
-        .eq('lastMessageId', messageId)
+        .eq('id', campaignContactId)
         .single();
 
       if (error) {

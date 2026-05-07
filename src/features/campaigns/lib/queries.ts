@@ -55,32 +55,39 @@ export async function getCampaignById(id: string) {
 }
 
 export async function getCampaignAnalytics(campaignId: string) {
-  const [
-    { data: contacts, error: contactError },
-    { data: events, error: eventError }
-  ] = await Promise.all([
-    supabase.from('CampaignContact').select('stepStatus').eq('campaignId', campaignId),
-    supabase.from('EmailEvent').select('eventType').eq('contact:Contact(campaignContacts!inner(campaignId))', campaignId)
-  ]);
+  // 1. Buscar IDs dos contatos nesta campanha
+  const { data: campaignContacts, error: ccError } = await supabase
+    .from('CampaignContact')
+    .select('contactId, stepStatus')
+    .eq('campaignId', campaignId);
 
-  if (contactError || eventError) {
-    console.error('Erro ao buscar analytics da campanha:', contactError || eventError);
+  if (ccError || !campaignContacts) {
+    console.error('Erro ao buscar contacts da campanha:', ccError);
     return { statusCounts: {}, eventCounts: {}, totalContacts: 0 };
   }
 
+  const contactIds = campaignContacts.map(c => c.contactId);
+
+  // 2. Calcular status counts
   const statusCounts: Record<string, number> = {};
-  if (contacts) {
-    for (const c of contacts) {
-      statusCounts[c.stepStatus] = (statusCounts[c.stepStatus] ?? 0) + 1;
-    }
+  for (const c of campaignContacts) {
+    statusCounts[c.stepStatus] = (statusCounts[c.stepStatus] ?? 0) + 1;
   }
 
+  // 3. Buscar eventos apenas dos contatos desta campanha
   const eventCounts: Record<string, number> = {};
-  if (events) {
-    for (const e of events) {
-      eventCounts[e.eventType] = (eventCounts[e.eventType] ?? 0) + 1;
+  if (contactIds.length > 0) {
+    const { data: events, error: eventError } = await supabase
+      .from('EmailEvent')
+      .select('eventType')
+      .in('contactId', contactIds);
+
+    if (!eventError && events) {
+      for (const e of events) {
+        eventCounts[e.eventType] = (eventCounts[e.eventType] ?? 0) + 1;
+      }
     }
   }
 
-  return { statusCounts, eventCounts, totalContacts: contacts?.length || 0 };
+  return { statusCounts, eventCounts, totalContacts: campaignContacts.length };
 }

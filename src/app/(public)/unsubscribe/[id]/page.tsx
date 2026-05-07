@@ -1,4 +1,4 @@
-import { supabase } from "@/shared/lib/supabase";
+import { supabaseAdmin } from "@/shared/lib/supabase";
 import { Mail, ShieldCheck, XCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 
@@ -13,10 +13,10 @@ interface UnsubscribePageProps {
 export default async function UnsubscribePage({ params }: UnsubscribePageProps) {
   const { id: contactId } = await params;
 
-  // 1. Verificar se o contato existe via HTTPS
-  const { data: contact, error } = await supabase
+  // 1. Verificar se o contato existe via Admin (público não tem RLS pra ler)
+  const { data: contact, error } = await supabaseAdmin
     .from('Contact')
-    .select('id, email, name')
+    .select('id, email, name, status')
     .eq('id', contactId)
     .single();
 
@@ -24,18 +24,26 @@ export default async function UnsubscribePage({ params }: UnsubscribePageProps) 
     notFound();
   }
 
+  // Se já estiver descadastrado, mostrar mensagem diferente
+  const alreadyUnsubscribed = contact.status === 'UNSUBSCRIBED';
+
   // Action para processar o descadastro
   async function handleUnsubscribe() {
     'use server';
-    await supabase
+    
+    // Usar Admin para garantir que o update funcione (bypass RLS)
+    const { importSupabaseAdmin } = await import("@/shared/lib/supabase-server");
+    const admin = importSupabaseAdmin();
+    
+    await admin
       .from('Contact')
-      .update({ status: 'UNSUBSCRIBED' })
+      .update({ status: 'UNSUBSCRIBED', updatedAt: new Date().toISOString() })
       .eq('id', contactId);
       
     // Também pausar todas as campanhas ativas para este contato
-    await supabase
+    await admin
       .from('CampaignContact')
-      .update({ isPaused: true, stepStatus: 'UNSUBSCRIBED' })
+      .update({ isPaused: true, stepStatus: 'PENDING', updatedAt: new Date().toISOString() })
       .eq('contactId', contactId);
   }
 
@@ -49,22 +57,29 @@ export default async function UnsubscribePage({ params }: UnsubscribePageProps) 
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-surface-50">Sentiremos sua falta!</h1>
+          <h1 className="text-2xl font-bold text-surface-50">
+            {alreadyUnsubscribed ? "Você já foi descadastrado" : "Sentiremos sua falta!"}
+          </h1>
           <p className="text-surface-400 text-sm">
             Olá <span className="text-surface-200 font-medium">{contact.name || contact.email}</span>, 
-            confirmamos sua solicitação para parar de receber nossos e-mails.
+            {alreadyUnsubscribed 
+              ? " você já foi removido da nossa lista de e-mails."
+              : " confirmamos sua solicitação para parar de receber nossos e-mails."
+            }
           </p>
         </div>
 
-        <form action={handleUnsubscribe}>
-          <button
-            type="submit"
-            className="w-full py-4 bg-surface-800 hover:bg-red-500/20 hover:text-red-400 border border-surface-700 hover:border-red-500/30 rounded-xl font-bold text-surface-200 transition-all active:scale-[0.98] group flex items-center justify-center gap-2"
-          >
-            <XCircle className="h-5 w-5 group-hover:animate-pulse" />
-            Confirmar Descadastro
-          </button>
-        </form>
+        {!alreadyUnsubscribed && (
+          <form action={handleUnsubscribe}>
+            <button
+              type="submit"
+              className="w-full py-4 bg-surface-800 hover:bg-red-500/20 hover:text-red-400 border border-surface-700 hover:border-red-500/30 rounded-xl font-bold text-surface-200 transition-all active:scale-[0.98] group flex items-center justify-center gap-2"
+            >
+              <XCircle className="h-5 w-5 group-hover:animate-pulse" />
+              Confirmar Descadastro
+            </button>
+          </form>
+        )}
 
         <div className="pt-4 border-t border-surface-800">
           <div className="flex items-center justify-center gap-2 text-[10px] text-surface-600 uppercase tracking-widest">

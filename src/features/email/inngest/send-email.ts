@@ -5,7 +5,7 @@ import { inngest } from "@/shared/lib/inngest";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
-import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
+import { incrementProviderSendCount, canProviderSendToday } from "@/features/email/lib/provider-selector";
 import { rewriteLinks } from "@/features/email/lib/link-tracker";
 import { env } from "@/shared/lib/env";
 import { logger } from "@/shared/lib/logger";
@@ -51,6 +51,17 @@ export const sendEmail = inngest.createFunction(
     }) as any;
 
     if (contact?.skipped) return contact;
+
+    // Check daily limit (P3)
+    const canSend = await step.run("check-daily-limit", async () => {
+      return canProviderSendToday(contact.provider);
+    });
+
+    if (!canSend) {
+      // Re-enfileirar para o próximo dia se o limite estourou
+      await step.sleep("wait-for-daily-reset", "24h");
+      throw new Error(`Daily limit reached for provider ${contact.provider}. Retrying tomorrow.`);
+    }
 
     // 2. Renderização e Tracking
     // 1b. Lógica de A/B Testing (Fase 7)

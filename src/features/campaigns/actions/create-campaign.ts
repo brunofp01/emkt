@@ -150,24 +150,29 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
     if (contacts && firstStep) {
       console.log(`[Diagnostic] Ativando ${contacts.length} contatos para a campanha ${campaignId}`);
       
-      for (const cc of contacts) {
-        // Enviar evento de disparo para o Inngest
-        await inngest.send({
-          name: "email/send",
-          data: {
-            contactId: cc.contactId,
-            campaignContactId: cc.id,
-            subject: firstStep.subject,
-            htmlBody: firstStep.htmlBody,
-            textBody: firstStep.textBody,
-          },
-        });
+      // Processar em lotes de 50 para evitar rate limiting dos provedores
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+        const batch = contacts.slice(i, i + BATCH_SIZE);
+        
+        // Enviar todos do lote em paralelo
+        await Promise.all(batch.map(async (cc) => {
+          await inngest.send({
+            name: "email/send",
+            data: {
+              contactId: cc.contactId,
+              campaignContactId: cc.id,
+              subject: firstStep.subject,
+              htmlBody: firstStep.htmlBody,
+              textBody: firstStep.textBody,
+            },
+          });
 
-        // Atualizar status para QUEUED (já está na fila do Inngest)
-        await supabase
-          .from('CampaignContact')
-          .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
-          .eq('id', cc.id);
+          await supabase
+            .from('CampaignContact')
+            .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
+            .eq('id', cc.id);
+        }));
       }
     }
 
