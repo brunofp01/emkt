@@ -5,10 +5,34 @@ import { z } from "zod";
 import { prisma } from "@/shared/lib/prisma";
 import { inngest } from "@/shared/lib/inngest";
 
+const DEFAULT_TEMPLATE = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #e0e0e0; }
+    .footer { margin-top: 30px; font-size: 12px; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p>Olá, {{contactName}}!</p>
+    <p>Obrigado por se conectar conosco. Gostaríamos de compartilhar algumas novidades importantes sobre como podemos ajudar a impulsionar seus resultados.</p>
+    <p>Podemos agendar uma breve conversa de 10 minutos esta semana?</p>
+    <p>Atenciosamente,<br>Equipe de Sucesso</p>
+  </div>
+  <div class="footer">
+    Sent with MailPulse
+  </div>
+</body>
+</html>
+`;
+
 const campaignStepSchema = z.object({
   stepOrder: z.number().int().positive(),
   subject: z.string().min(1, "Assunto obrigatório"),
-  htmlBody: z.string().min(1, "Corpo do email obrigatório"),
+  htmlBody: z.string(), // Permitimos vazio para injetar o padrão
   textBody: z.string().optional(),
   design: z.any().optional(),
   delayHours: z.number().int().min(0).default(0),
@@ -27,7 +51,7 @@ const createCampaignSchema = z.object({
 export type CampaignActionState = { success?: boolean; error?: string; campaignId?: string };
 
 /**
- * Cria uma nova campanha usando Prisma para garantir geração de CUID e timestamps.
+ * Cria uma nova campanha usando Prisma.
  */
 export async function createCampaign(_prevState: CampaignActionState, formData: FormData): Promise<CampaignActionState> {
   try {
@@ -49,13 +73,13 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
           create: validated.steps.map(step => ({
             stepOrder: step.stepOrder,
             subject: step.subject,
-            htmlBody: step.htmlBody,
+            htmlBody: step.htmlBody.trim() || DEFAULT_TEMPLATE,
             textBody: step.textBody || null,
-            design: step.design || null,
+            design: step.design || { isDefault: true },
             delayHours: step.delayHours,
             isABTest: step.isABTest,
             subjectB: step.subjectB || null,
-            htmlBodyB: step.htmlBodyB || null,
+            htmlBodyB: (step.isABTest && !step.htmlBodyB?.trim()) ? DEFAULT_TEMPLATE : (step.htmlBodyB || null),
             designB: step.designB || null,
           }))
         }
@@ -65,15 +89,11 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
     revalidatePath("/campaigns");
     return { success: true, campaignId: campaign.id };
   } catch (err: any) {
-    console.error('CRITICAL ACTION ERROR:', err);
-    
-    // Retornamos o erro detalhado para diagnóstico
-    const errorMessage = err instanceof Error ? err.message : "Erro desconhecido";
-    const errorStack = err instanceof Error ? err.stack : "";
-    
-    return { 
-      error: `[DIAGNOSTICO]: ${errorMessage} | STACK: ${errorStack?.slice(0, 200)}...` 
-    };
+    console.error('Action error (createCampaign):', err);
+    if (err instanceof z.ZodError) {
+      return { error: err.errors[0]?.message ?? "Dados inválidos." };
+    }
+    return { error: err instanceof Error ? err.message : "Erro ao criar campanha." };
   }
 }
 
