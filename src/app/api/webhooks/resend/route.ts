@@ -1,10 +1,9 @@
 /**
- * Webhook — Resend
- * Refatorado para usar Supabase SDK (HTTPS).
+ * Webhook — Resend (Hardened & Unified)
  */
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
-import { supabase } from "@/shared/lib/supabase";
+import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 import type { EmailEventType } from "@prisma/client";
 
@@ -41,26 +40,17 @@ export async function POST(req: NextRequest) {
     const messageId = (data.email_id as string) ?? "";
     const recipientEmail = Array.isArray(data.to) ? data.to[0] : (data.to as string);
 
-    // Idempotência via HTTPS
-    const { data: existing } = await supabase
-      .from('EmailEvent')
-      .select('id')
-      .eq('externalId', externalId)
-      .single();
-
-    if (existing) return NextResponse.json({ duplicate: true }, { status: 200 });
-
-    // Buscar contato via HTTPS
-    const { data: contact } = await supabase
+    // 1. Idempotência e Busca de Contato (Admin Client)
+    const { data: contact } = await supabaseAdmin
       .from('Contact')
-      .select('id')
+      .select('id, tags')
       .eq('email', recipientEmail)
       .single();
 
     if (!contact) return NextResponse.json({ skipped: true, reason: "contact not found" }, { status: 200 });
 
-    // Salvar evento via HTTPS
-    const { error: eventError } = await supabase
+    // 2. Persistência do Evento
+    const { error: eventError } = await supabaseAdmin
       .from('EmailEvent')
       .insert({
         externalId,
@@ -76,16 +66,36 @@ export async function POST(req: NextRequest) {
         timestamp: new Date((data.created_at as string) ?? Date.now()).toISOString(),
       });
 
-    if (eventError) throw eventError;
+    if (eventError && eventError.code !== '23505') throw eventError; // Ignora erro de duplicidade (PGRST116/23505)
 
-    if (mappedType === "OPENED") {
-      await inngest.send({ name: "email/opened", data: { messageId } });
+    // 3. Lógica Unificada de Comportamento (Fase 4 & 6)
+    const updates: Record<string, any> = {};
+    
+    // Se clicou via provedor, adicionar tag (Fase 6)
+    if (mappedType === "CLICKED") {
+      const currentTags = contact.tags || [];
+      if (!currentTags.includes('CLICKED')) {
+        updates.tags = [...currentTags, 'CLICKED'];
+      }
     }
 
+    // Se bounce ou reclamação, bloquear contato (Fase 4)
     if (mappedType === "BOUNCED_HARD") {
-      await supabase.from('Contact').update({ status: "BOUNCED" }).eq('id', contact.id);
+      updates.status = "BOUNCED";
     } else if (mappedType === "COMPLAINED") {
-      await supabase.from('Contact').update({ status: "COMPLAINED" }).eq('id', contact.id);
+      updates.status = "COMPLAINED";
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await supabaseAdmin.from('Contact').update(updates).eq('id', contact.id);
+    }
+
+    // 4. Trigger de Automação de Próxima Etapa
+    if (mappedType === "OPENED" || mappedType === "CLICKED") {
+      await inngest.send({ 
+        name: mappedType === "OPENED" ? "email/opened" : "email/clicked", 
+        data: { messageId, contactId: contact.id } 
+      });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

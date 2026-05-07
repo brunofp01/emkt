@@ -1,9 +1,8 @@
 /**
- * Inngest Function — Envio de email via provedor vinculado.
- * Refatorado para usar Supabase SDK (HTTPS) e Link Tracking.
+ * Inngest Function — Envio de email via provedor vinculado (Hardened).
  */
 import { inngest } from "@/shared/lib/inngest";
-import { supabase } from "@/shared/lib/supabase";
+import { supabaseAdmin } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
 import { renderTemplate } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
@@ -27,50 +26,36 @@ export const sendEmail = inngest.createFunction(
       textBody?: string;
     };
 
-    // Step 1: Buscar contato via HTTPS
-    const contact = await step.run("fetch-contact", async () => {
-      const { data, error } = await supabase
-        .from('Contact')
-        .select('*')
-        .eq('id', contactId)
-        .single();
-      if (error) throw error;
-      return data;
-    });
+    // 1. Buscar contato e configurações (Bypass RLS para velocidade e segurança)
+    const { contact, providerConfig } = await step.run("fetch-requirements", async () => {
+      const [{ data: contact }, { data: campaignContact }] = await Promise.all([
+        supabaseAdmin.from('Contact').select('*').eq('id', contactId).single(),
+        supabaseAdmin.from('CampaignContact').select('isPaused, stepStatus').eq('id', campaignContactId).single()
+      ]);
 
-    // --- ESCUDO DE ENTREGABILIDADE (FASE 4) ---
-    if (contact.status !== 'ACTIVE') {
-      return { skipped: true, reason: `Contact status is ${contact.status}` };
-    }
+      if (!contact) throw new Error("Contact not found");
+      
+      // Validação de segurança/entregabilidade
+      if (contact.status !== 'ACTIVE') {
+        return { skipped: true, reason: `Contact status is ${contact.status}` };
+      }
 
-    // Verificar se o vínculo com a campanha ainda é válido
-    const campaignContact = await step.run("fetch-campaign-contact", async () => {
-      const { data, error } = await supabase
-        .from('CampaignContact')
-        .select('isPaused, stepStatus')
-        .eq('id', campaignContactId)
-        .single();
-      if (error) return null;
-      return data;
-    });
+      if (!campaignContact || campaignContact.isPaused || campaignContact.stepStatus === 'UNSUBSCRIBED') {
+        return { skipped: true, reason: "Campaign contact is invalid or paused" };
+      }
 
-    if (!campaignContact || campaignContact.isPaused || campaignContact.stepStatus === 'UNSUBSCRIBED') {
-      return { skipped: true, reason: "Campaign contact is paused, unsubscribed or invalid" };
-    }
-    // ------------------------------------------
-
-    // Step 1b: Buscar config do provedor via HTTPS
-    const providerConfig = await step.run("fetch-provider-config", async () => {
-      const { data, error } = await supabase
+      const { data: config } = await supabaseAdmin
         .from('ProviderConfig')
         .select('*')
         .eq('provider', contact.provider)
         .single();
-      if (error) throw error;
-      return data;
-    });
 
-    // Step 2: Renderizar template básico
+      return { contact, providerConfig: config };
+    }) as any;
+
+    if (contact?.skipped) return contact;
+
+    // 2. Renderização e Tracking
     const templateVars = {
       contactId: contact.id,
       contactName: contact.name ?? "",
@@ -81,7 +66,6 @@ export const sendEmail = inngest.createFunction(
     const renderedHtml = renderTemplate(htmlBody, templateVars);
     const renderedSubject = renderTemplate(subject, templateVars);
 
-    // Step 2b: APLICAR LINK TRACKING (Fase 2)
     const trackedHtml = await step.run("apply-link-tracking", async () => {
       return rewriteLinks({
         html: renderedHtml,
@@ -90,7 +74,7 @@ export const sendEmail = inngest.createFunction(
       });
     });
 
-    // Step 3: Enviar via provedor vinculado
+    // 3. Disparo via SDK do Provedor
     const result = await step.run("send-via-provider", async () => {
       const provider = getEmailProvider(contact.provider);
       return provider.send({
@@ -98,7 +82,7 @@ export const sendEmail = inngest.createFunction(
         from: providerConfig.fromEmail,
         fromName: providerConfig.fromName,
         subject: renderedSubject,
-        html: trackedHtml, // Usando o HTML com links rastreáveis
+        html: trackedHtml,
         text: textBody,
       });
     });
@@ -107,20 +91,20 @@ export const sendEmail = inngest.createFunction(
       throw new Error(`Falha no envio via ${contact.provider}: ${result.error}`);
     }
 
-    // Step 4: Atualizar CampaignContact com messageId via HTTPS
-    await step.run("update-campaign-contact", async () => {
-      const { error } = await supabase
-        .from('CampaignContact')
-        .update({
-          stepStatus: "SENT",
-          lastMessageId: result.messageId,
-          lastSentAt: new Date().toISOString(),
-        })
-        .eq('id', campaignContactId);
-      
-      if (error) throw error;
-      
-      await incrementProviderSendCount(contact.provider);
+    // 4. Persistência de Resultados (Atômico)
+    await step.run("finalize-send", async () => {
+      await Promise.all([
+        supabaseAdmin
+          .from('CampaignContact')
+          .update({
+            stepStatus: "SENT",
+            lastMessageId: result.messageId,
+            lastSentAt: new Date().toISOString(),
+          })
+          .eq('id', campaignContactId),
+        
+        incrementProviderSendCount(contact.provider)
+      ]);
     });
 
     return { success: true, messageId: result.messageId, provider: contact.provider };
