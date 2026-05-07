@@ -10,6 +10,7 @@ const campaignStepSchema = z.object({
   subject: z.string().min(1, "Assunto obrigatório"),
   htmlBody: z.string().min(1, "Corpo do email obrigatório"),
   textBody: z.string().optional(),
+  design: z.any().optional(),
   delayHours: z.number().int().min(0).default(0),
 });
 
@@ -47,8 +48,13 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 
     // 2. Criar as etapas
     const stepsData = validated.steps.map(step => ({
-      ...step,
-      campaignId: campaign.id
+      campaignId: campaign.id,
+      stepOrder: step.stepOrder,
+      subject: step.subject,
+      htmlBody: step.htmlBody,
+      textBody: step.textBody,
+      design: step.design,
+      delayHours: step.delayHours,
     }));
 
     const { error: stepsError } = await supabase

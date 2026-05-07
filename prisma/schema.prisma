@@ -116,6 +116,7 @@ model CampaignStep {
   subject    String
   htmlBody   String @db.Text
   textBody   String? @db.Text
+  design     Json?
   delayHours Int    @default(0)
 
   createdAt DateTime @default(now())
