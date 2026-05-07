@@ -44,7 +44,7 @@ export async function bulkImportContacts(contacts: ImportContact[], campaignId?:
       .from('Contact')
       .upsert(dataToInsert, { 
         onConflict: 'email',
-        ignoreDuplicates: true 
+        ignoreDuplicates: false 
       });
 
     if (upsertError) {

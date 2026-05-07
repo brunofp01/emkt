@@ -66,54 +66,36 @@ export async function createContact(
     const validated = createContactSchema.parse(rawData);
     console.log('[Diagnostic] Dados validados com sucesso.');
 
-    // 2. Verificar duplicidade via HTTPS
-    console.log('[Diagnostic] Verificando se contato já existe...');
-    const { data: existing, error: checkError } = await supabase
+    // 2. Upsert do Contato (Cria se não existe, atualiza se existe)
+    console.log('[Diagnostic] Realizando upsert do contato...');
+    const contactIdToUse = generateId();
+    
+    // Tentamos inserir/atualizar. O 'onConflict' garante que e-mails duplicados não gerem erro.
+    const { data: contact, error: upsertError } = await supabase
       .from('Contact')
+      .upsert({
+        id: contactIdToUse, // Será ignorado se houver conflito e ignoreDuplicates for false, ou usado se novo
+        email: validated.email,
+        name: validated.name,
+        company: validated.company,
+        phone: validated.phone,
+        tags: validated.tags ?? [],
+        provider: await selectProviderForNewContact(),
+        updatedAt: new Date().toISOString(),
+      }, { 
+        onConflict: 'email',
+        ignoreDuplicates: false 
+      })
       .select('id')
-      .eq('email', validated.email)
       .single();
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('[Diagnostic] Erro ao verificar duplicidade:', checkError);
-      throw new Error(`Erro de banco (check): ${checkError.message}`);
+    if (upsertError) {
+      console.error('[Diagnostic] Erro no upsert do contato:', upsertError);
+      throw new Error(`Erro de banco (upsert): ${upsertError.message}`);
     }
 
-    let contactId = existing?.id;
-
-    if (!existing) {
-      console.log('[Diagnostic] Contato novo. Selecionando provedor...');
-      // 3. Selecionar provedor
-      const selectedProvider = await selectProviderForNewContact();
-      console.log('[Diagnostic] Provedor selecionado:', selectedProvider);
-
-      // 4. Criar contato via HTTPS
-      console.log('[Diagnostic] Inserindo contato no banco...');
-      const contactIdToInsert = generateId();
-      const { data: contact, error } = await supabase
-        .from('Contact')
-        .insert({
-          id: contactIdToInsert,
-          email: validated.email,
-          name: validated.name,
-          company: validated.company,
-          phone: validated.phone,
-          tags: validated.tags ?? [],
-          provider: selectedProvider,
-          updatedAt: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('[Diagnostic] Erro na inserção:', error);
-        throw new Error(`Erro de banco (insert): ${error.message}`);
-      }
-      contactId = contact.id;
-      console.log('[Diagnostic] Contato criado com ID:', contactId);
-    } else {
-      console.log('[Diagnostic] Contato já existente com ID:', contactId);
-    }
+    const contactId = contact.id;
+    console.log('[Diagnostic] Contato processado com ID:', contactId);
 
     // 5. Se houver campanha selecionada, adicionar à campanha
     if (validated.campaignId && contactId) {
