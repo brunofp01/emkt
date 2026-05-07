@@ -67,7 +67,15 @@ export async function canProviderSendToday(provider: EmailProvider): Promise<boo
     .eq('provider', provider)
     .single();
 
-  if (error || !config || !config.isActive) return false;
+  if (error || !config) {
+    console.error("[canProviderSendToday] Error or config not found:", error, "Provider:", provider);
+    return false;
+  }
+  
+  if (!config.isActive) {
+    console.log(`[canProviderSendToday] Provider ${provider} is not active.`);
+    return false;
+  }
 
   const now = new Date();
   const lastReset = new Date(config.lastResetAt);
