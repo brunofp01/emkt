@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       const currentTags = contact?.tags || [];
 
       // 2. Registrar evento + atualizar tags em paralelo
-      const updates: Promise<any>[] = [
+      const updates: any[] = [
         // Registrar evento de clique
         supabaseAdmin.from('EmailEvent').insert({
           id: generateId(),
