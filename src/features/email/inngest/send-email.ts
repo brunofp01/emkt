@@ -38,6 +38,27 @@ export const sendEmail = inngest.createFunction(
       return data;
     });
 
+    // --- ESCUDO DE ENTREGABILIDADE (FASE 4) ---
+    if (contact.status !== 'ACTIVE') {
+      return { skipped: true, reason: `Contact status is ${contact.status}` };
+    }
+
+    // Verificar se o vínculo com a campanha ainda é válido
+    const campaignContact = await step.run("fetch-campaign-contact", async () => {
+      const { data, error } = await supabase
+        .from('CampaignContact')
+        .select('isPaused, stepStatus')
+        .eq('id', campaignContactId)
+        .single();
+      if (error) return null;
+      return data;
+    });
+
+    if (!campaignContact || campaignContact.isPaused || campaignContact.stepStatus === 'UNSUBSCRIBED') {
+      return { skipped: true, reason: "Campaign contact is paused, unsubscribed or invalid" };
+    }
+    // ------------------------------------------
+
     // Step 1b: Buscar config do provedor via HTTPS
     const providerConfig = await step.run("fetch-provider-config", async () => {
       const { data, error } = await supabase
@@ -50,16 +71,15 @@ export const sendEmail = inngest.createFunction(
     });
 
     // Step 2: Renderizar template básico
-    const renderedHtml = renderTemplate(htmlBody, {
+    const templateVars = {
+      contactId: contact.id,
       contactName: contact.name ?? "",
       contactEmail: contact.email,
       contactCompany: contact.company ?? "",
-    });
-    const renderedSubject = renderTemplate(subject, {
-      contactName: contact.name ?? "",
-      contactEmail: contact.email,
-      contactCompany: contact.company ?? "",
-    });
+    };
+
+    const renderedHtml = renderTemplate(htmlBody, templateVars);
+    const renderedSubject = renderTemplate(subject, templateVars);
 
     // Step 2b: APLICAR LINK TRACKING (Fase 2)
     const trackedHtml = await step.run("apply-link-tracking", async () => {

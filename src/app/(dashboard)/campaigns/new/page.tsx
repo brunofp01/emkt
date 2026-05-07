@@ -20,7 +20,7 @@ interface StepData {
 export default function NewCampaignPage() {
   const router = useRouter();
   const [steps, setSteps] = useState<StepData[]>([
-    { stepOrder: 1, subject: "", htmlBody: "", textBody: "", design: null, delayHours: 0 },
+    { stepOrder: 1, subject: "", htmlBody: "", textBody: "", design: null, conditions: null, delayHours: 0 },
   ]);
 
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
@@ -35,7 +35,7 @@ export default function NewCampaignPage() {
 
   const addStep = () => {
     setSteps((prev) => [...prev, {
-      stepOrder: prev.length + 1, subject: "", htmlBody: "", textBody: "", design: null, delayHours: 0,
+      stepOrder: prev.length + 1, subject: "", htmlBody: "", textBody: "", design: null, conditions: null, delayHours: 0,
     }]);
   };
 
