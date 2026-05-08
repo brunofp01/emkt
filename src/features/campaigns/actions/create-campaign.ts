@@ -88,6 +88,8 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
         name: validated.name,
         description: validated.description || null,
         status: 'DRAFT',
+        audienceType: validated.audienceType,
+        audienceTags: validated.audienceTags,
         updatedAt: new Date().toISOString(),
       });
 
@@ -122,13 +124,14 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
       
       if (validated.audienceType === "TAGS" && validated.audienceTags.length > 0) {
         contactQuery = contactQuery.contains('tags', validated.audienceTags);
+      } else if (validated.audienceType === "ALL") {
+        // Sem filtro extra, pega todos os contatos
       }
 
       const { data: contactsToLink } = await contactQuery;
 
       if (contactsToLink && contactsToLink.length > 0) {
         const contactIds = contactsToLink.map(c => c.id);
-        // Usar a função auxiliar existente para vincular os contatos
         await addContactsToCampaign(campaignId, contactIds);
       }
     }
@@ -349,9 +352,19 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
     const stepsRaw = formData.get("steps") as string;
     const name = formData.get("name") as string;
     const description = (formData.get("description") as string) || null;
+    const audienceType = (formData.get("audienceType") as string) || "NONE";
+    const audienceTagsRaw = (formData.get("audienceTags") as string) || "[]";
 
     const parsedSteps = JSON.parse(stepsRaw || "[]");
-    const validated = createCampaignSchema.parse({ name, description, steps: parsedSteps });
+    const parsedTags = JSON.parse(audienceTagsRaw);
+
+    const validated = createCampaignSchema.parse({ 
+      name, 
+      description, 
+      steps: parsedSteps,
+      audienceType,
+      audienceTags: parsedTags
+    });
 
     // 1. Atualizar dados básicos
     const { error: updateError } = await supabase
@@ -359,16 +372,17 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
       .update({
         name: validated.name,
         description: validated.description,
+        audienceType: validated.audienceType,
+        audienceTags: validated.audienceTags,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', campaignId);
 
     if (updateError) throw updateError;
 
-    // 2. Limpar etapas antigas
+    // 2. Limpar etapas antigas e recriar
     await supabase.from('CampaignStep').delete().eq('campaignId', campaignId);
 
-    // 3. Criar novas etapas
     const stepsToInsert = validated.steps.map(step => ({
       id: generateId(),
       campaignId,
@@ -385,11 +399,23 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
       updatedAt: new Date().toISOString(),
     }));
 
-    const { error: stepsError } = await supabase
-      .from('CampaignStep')
-      .insert(stepsToInsert);
+    await supabase.from('CampaignStep').insert(stepsToInsert);
 
-    if (stepsError) throw stepsError;
+    // 3. Atualizar Público Alvo (se solicitado)
+    if (validated.audienceType !== "NONE") {
+      let contactQuery = supabase.from('Contact').select('id');
+      
+      if (validated.audienceType === "TAGS" && validated.audienceTags.length > 0) {
+        contactQuery = contactQuery.contains('tags', validated.audienceTags);
+      }
+
+      const { data: contactsToLink } = await contactQuery;
+
+      if (contactsToLink && contactsToLink.length > 0) {
+        const contactIds = contactsToLink.map(c => c.id);
+        await addContactsToCampaign(campaignId, contactIds);
+      }
+    }
 
     revalidatePath("/campaigns");
     revalidatePath(`/campaigns/${campaignId}`);

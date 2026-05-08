@@ -1,9 +1,8 @@
 "use client";
-
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { updateCampaign, type CampaignActionState } from "@/features/campaigns/actions/create-campaign";
-import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info } from "lucide-react";
+import { updateCampaign, type CampaignActionState, getAvailableTags } from "@/features/campaigns/actions/create-campaign";
+import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info, Target, Users as UsersIcon, Tag, Clock, ArrowDown, ChevronUp, ChevronDown, Zap, Save, X } from "lucide-react";
 import Link from "next/link";
 import { EmailCodeEditor } from "@/features/campaigns/components/email-code-editor";
 
@@ -39,8 +38,13 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
     designB: s.designB,
   })));
 
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [audienceType, setAudienceType] = useState<"NONE" | "ALL" | "TAGS">(campaign.audienceType || "NONE");
+  const [selectedTags, setSelectedTags] = useState<string[]>(campaign.audienceTags || []);
+
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [editingVariant, setEditingVariant] = useState<"A" | "B">("A");
+  const [expandedStep, setExpandedStep] = useState<number>(0);
 
   const [campaignName, setCampaignName] = useState(campaign.name || "");
   const [campaignDescription, setCampaignDescription] = useState(campaign.description || "");
@@ -50,6 +54,11 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   );
 
   useEffect(() => {
+    // Carregar tags disponíveis para o seletor de público
+    getAvailableTags().then(setAvailableTags);
+  }, []);
+
+  useEffect(() => {
     if (state.success) {
       router.push(`/campaigns/${campaign.id}`);
       router.refresh();
@@ -57,18 +66,28 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   }, [state.success, campaign.id, router]);
 
   const addStep = () => {
-    setSteps((prev) => [...prev, {
-      stepOrder: prev.length + 1, subject: "", htmlBody: "", textBody: "", design: null, conditions: null, delayHours: 0,
+    const newStep: StepData = {
+      stepOrder: steps.length + 1, subject: "", htmlBody: "", textBody: "", design: null, conditions: null, delayHours: 24,
       isABTest: false, subjectB: "", htmlBodyB: "", designB: null
-    }]);
+    };
+    setSteps((prev) => [...prev, newStep]);
+    setExpandedStep(steps.length);
   };
 
   const removeStep = (index: number) => {
     setSteps((prev) => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, stepOrder: i + 1 })));
+    if (expandedStep === index) setExpandedStep(Math.max(0, index - 1));
+    else if (expandedStep > index) setExpandedStep(expandedStep - 1);
   };
 
   const updateStep = (index: number, field: keyof StepData, value: any) => {
     setSteps((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  };
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
   };
 
   const handleSaveDesign = (html: string) => {
@@ -84,8 +103,15 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
     }
   };
 
-  const inputClass = "h-10 w-full rounded-lg border border-surface-800 bg-surface-900/50 px-4 text-sm text-surface-200 placeholder:text-surface-600 focus:border-primary-500/50 focus:outline-none focus:ring-1 focus:ring-primary-500/20";
-  const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wider text-surface-400";
+  const isStepComplete = (step: StepData) => {
+    const hasSubject = !!step.subject.trim();
+    const hasDesign = !!step.design;
+    const abOk = !step.isABTest || (!!step.subjectB.trim());
+    return hasSubject && hasDesign && abOk;
+  };
+
+  const inputClass = "input-base h-10";
+  const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500";
 
   if (editingStepIndex !== null) {
     const currentStep = steps[editingStepIndex];
@@ -102,14 +128,14 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   }
 
   return (
-    <div className="space-y-6">
-      <Link href={`/campaigns/${campaign.id}`} className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
+    <div className="mx-auto max-w-5xl space-y-6 animate-fade-in pb-28">
+      <Link href={`/campaigns/${campaign.id}`} className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Cancelar Edição
       </Link>
 
       <div>
-        <h1 className="text-3xl font-bold text-surface-50">Editar Campanha</h1>
-        <p className="mt-1 text-sm text-surface-500">Ajuste sua régua de prospecção.</p>
+        <h1 className="text-2xl font-extrabold text-surface-50 tracking-tight">Editar Campanha</h1>
+        <p className="mt-1 text-sm text-surface-500">Ajuste os detalhes e o público alvo da sua régua.</p>
       </div>
 
       {state.error && (
@@ -120,110 +146,239 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
 
       <form action={(fd) => {
         fd.set("steps", JSON.stringify(steps));
+        fd.set("audienceType", audienceType);
+        fd.set("audienceTags", JSON.stringify(selectedTags));
         formAction(fd);
       }} className="space-y-8">
-        <div className="glass-card p-8 space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+        
+        {/* Informações da Campanha */}
+        <div className="glass-card !p-5">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className={labelClass}>Nome da Campanha *</label>
-              <input name="name" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} required className={inputClass} />
+              <input name="name" required placeholder="Ex: Prospecção Imobiliária 2026" className={inputClass} value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
             </div>
             <div>
               <label className={labelClass}>Descrição</label>
-              <input name="description" value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} className={inputClass} />
+              <input name="description" placeholder="Breve descrição interna" className={inputClass} value={campaignDescription} onChange={(e) => setCampaignDescription(e.target.value)} />
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400">Fluxo de Emails</h2>
+        {/* ═══════════════════ PÚBLICO ALVO ═══════════════════ */}
+        <div className="relative">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-surface-500 mb-6 flex items-center gap-2">
+            <Target className="h-3.5 w-3.5 text-primary-400" />
+            Público Alvo
+          </h2>
 
-          {steps.map((step, idx) => (
-            <div key={idx} className="glass-card relative overflow-hidden group">
-              <div className="absolute left-0 top-0 h-full w-1 bg-primary-500/30 group-hover:bg-primary-500 transition-colors" />
-              
-              <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500/10 text-sm font-bold text-primary-400 border border-primary-500/20">{step.stepOrder}</div>
-                    <span className="text-base font-semibold text-surface-100">Etapa {step.stepOrder}</span>
+          <div className="glass-card !p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-surface-500 uppercase tracking-widest">Ajustar Público da Campanha</p>
+              {audienceType !== "NONE" && (
+                <span className="text-[9px] font-bold text-primary-400 bg-primary-500/10 px-2 py-1 rounded">
+                  {audienceType === 'ALL' ? 'Todos os Contatos' : `${selectedTags.length} Tags Selecionadas`}
+                </span>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => setAudienceType("NONE")}
+                className={`p-4 rounded-xl border text-left transition-all ${audienceType === 'NONE' ? 'bg-primary-500/10 border-primary-500/40' : 'bg-surface-900/50 border-surface-800 hover:border-surface-700'}`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`p-1.5 rounded-lg ${audienceType === 'NONE' ? 'bg-primary-500 text-white' : 'bg-surface-800 text-surface-500'}`}>
+                    <X className="h-4 w-4" />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${audienceType === 'NONE' ? 'text-surface-50' : 'text-surface-400'}`}>Não adicionar mais</span>
+                </div>
+                <p className="text-[10px] text-surface-500 leading-relaxed">Mantém o público atual sem vincular novos contatos em massa agora.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAudienceType("ALL")}
+                className={`p-4 rounded-xl border text-left transition-all ${audienceType === 'ALL' ? 'bg-primary-500/10 border-primary-500/40' : 'bg-surface-900/50 border-surface-800 hover:border-surface-700'}`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`p-1.5 rounded-lg ${audienceType === 'ALL' ? 'bg-primary-500 text-white' : 'bg-surface-800 text-surface-500'}`}>
+                    <UsersIcon className="h-4 w-4" />
+                  </div>
+                  <span className={`text-xs font-bold ${audienceType === 'ALL' ? 'text-surface-50' : 'text-surface-400'}`}>Todos os Contatos</span>
+                </div>
+                <p className="text-[10px] text-surface-500 leading-relaxed">Sincroniza e adiciona todos os contatos ativos que ainda não estão no fluxo.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAudienceType("TAGS")}
+                className={`p-4 rounded-xl border text-left transition-all ${audienceType === 'TAGS' ? 'bg-primary-500/10 border-primary-500/40' : 'bg-surface-900/50 border-surface-800 hover:border-surface-700'}`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`p-1.5 rounded-lg ${audienceType === 'TAGS' ? 'bg-primary-500 text-white' : 'bg-surface-800 text-surface-500'}`}>
+                    <Tag className="h-4 w-4" />
+                  </div>
+                  <span className={`text-xs font-bold ${audienceType === 'TAGS' ? 'text-surface-50' : 'text-surface-400'}`}>Atualizar por Tags</span>
+                </div>
+                <p className="text-[10px] text-surface-500 leading-relaxed">Filtra novos contatos baseados nas tags e os inclui na campanha.</p>
+              </button>
+            </div>
+
+            {audienceType === "TAGS" && (
+              <div className="pt-4 border-t border-surface-800/40 animate-in slide-in-from-top-2">
+                <label className={labelClass}>Selecione as Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {availableTags.length > 0 ? availableTags.map(tag => (
                     <button
+                      key={tag}
                       type="button"
-                      onClick={() => updateStep(idx, "isABTest", !step.isABTest)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all ${step.isABTest ? 'bg-primary-500/10 border-primary-500 text-primary-400' : 'bg-surface-800 border-surface-700 text-surface-500 hover:text-surface-300'}`}
+                      onClick={() => toggleTag(tag)}
+                      className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                        selectedTags.includes(tag)
+                          ? 'bg-primary-500/20 border-primary-500 text-primary-400'
+                          : 'bg-surface-900 border-surface-800 text-surface-500 hover:border-surface-700'
+                      }`}
                     >
-                      <Split className="h-3 w-3" /> {step.isABTest ? "A/B Ativo" : "Ativar Teste A/B"}
+                      {tag}
                     </button>
-                    {steps.length > 1 && (
-                      <button type="button" onClick={() => removeStep(idx)} className="rounded-lg p-2 text-surface-600 hover:bg-red-500/10 hover:text-red-400 transition-all">
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    )}
-                  </div>
+                  )) : (
+                    <p className="text-[10px] text-surface-600 italic">Nenhuma tag encontrada.</p>
+                  )}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-[0.2em]">
-                    <span>Variante A</span>
-                  </div>
-                  <div className="grid gap-6 lg:grid-cols-12">
-                    <div className="lg:col-span-8">
-                      <label className={labelClass}>Assunto Variante A *</label>
-                      <input required value={step.subject} onChange={(e) => updateStep(idx, "subject", e.target.value)} className={inputClass} />
-                    </div>
-                    <div className="lg:col-span-4">
-                      <label className={labelClass}>Aguardar (Horas)</label>
-                      <input type="number" min={0} value={step.delayHours} disabled={idx === 0} onChange={(e) => updateStep(idx, "delayHours", parseInt(e.target.value) || 0)} className={`${inputClass} disabled:opacity-30`} />
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => { setEditingVariant("A"); setEditingStepIndex(idx); }} className="flex items-center gap-2 text-xs font-bold text-primary-400 hover:text-primary-300">
-                    <Layout className="h-3 w-3" /> Editar Código HTML A
-                  </button>
-                </div>
+        {/* ═══════════════════ FLUXOGRAMA VISUAL ═══════════════════ */}
+        <div className="relative">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-surface-500 mb-6 flex items-center gap-2">
+            <Zap className="h-3.5 w-3.5 text-primary-400" />
+            Fluxo de Emails
+          </h2>
 
-                {step.isABTest && (
-                  <div className="pt-6 border-t border-surface-800/50 space-y-4 animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-violet-400 uppercase tracking-[0.2em]">
-                      <Split className="h-3 w-3" /> Variante B
-                    </div>
-                    <div className="grid gap-6">
-                      <div>
-                        <label className={labelClass}>Assunto Variante B *</label>
-                        <input required value={step.subjectB} onChange={(e) => updateStep(idx, "subjectB", e.target.value)} className={inputClass} />
+          <div className="absolute left-[27px] top-14 bottom-4 w-px bg-gradient-to-b from-primary-500/40 via-primary-500/20 to-transparent hidden md:block" />
+
+          <div className="space-y-0">
+            {steps.map((step, idx) => {
+              const isExpanded = expandedStep === idx;
+              const complete = isStepComplete(step);
+
+              return (
+                <div key={idx} className="relative">
+                  {idx > 0 && (
+                    <div className="flex flex-col items-center py-3 md:ml-[27px] md:items-start">
+                      <div className="flex items-center gap-2">
+                        <ArrowDown className="h-4 w-4 text-primary-500/50" />
+                        {step.delayHours > 0 && (
+                          <span className="text-[10px] font-semibold text-amber-400/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" />
+                            Aguardar {step.delayHours}h
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <button type="button" onClick={() => { setEditingVariant("B"); setEditingStepIndex(idx); }} className="flex items-center gap-2 text-xs font-bold text-violet-400 hover:text-violet-300">
-                      <Layout className="h-3 w-3" /> Editar Código HTML B
-                    </button>
+                  )}
+
+                  <div className="flex gap-4 relative">
+                    <div className="hidden md:flex flex-col items-center z-10">
+                      <div className={`h-[54px] w-[54px] rounded-2xl flex items-center justify-center border-2 transition-all ${
+                        complete 
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400' 
+                          : isExpanded 
+                            ? 'bg-primary-500/10 border-primary-500/40 text-primary-400' 
+                            : 'bg-surface-900 border-surface-800 text-surface-500'
+                      }`}>
+                        {complete ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-lg font-black">{step.stepOrder}</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex-1">
+                      <div className={`glass-card !p-0 overflow-hidden transition-all ${isExpanded ? 'ring-1 ring-primary-500/30' : ''}`}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedStep(isExpanded ? -1 : idx)}
+                          className="w-full flex items-center justify-between p-4 text-left hover:bg-surface-800/10 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-surface-200">Etapa {step.stepOrder}</span>
+                                {step.isABTest && <span className="text-[9px] font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded">A/B</span>}
+                              </div>
+                              <p className="text-xs text-surface-500 truncate mt-0.5 max-w-[300px]">{step.subject || "Assunto não definido..."}</p>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp className="h-4 w-4 text-surface-500" /> : <ChevronDown className="h-4 w-4 text-surface-500" />}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-surface-800/40 p-5 space-y-5 animate-in slide-in-from-top-1">
+                            <div className="flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => updateStep(idx, "isABTest", !step.isABTest)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all ${step.isABTest ? 'bg-violet-500/10 border-violet-500/30 text-violet-400' : 'bg-surface-800/50 border-surface-800 text-surface-500 hover:text-surface-300'}`}
+                              >
+                                <Split className="h-3 w-3" /> Teste A/B
+                              </button>
+                              {steps.length > 1 && (
+                                <button type="button" onClick={() => removeStep(idx)} className="text-[10px] font-bold text-surface-600 hover:text-red-400">
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remover
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid gap-4">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                  <label className={labelClass}>Assunto A *</label>
+                                  <input required value={step.subject} onChange={(e) => updateStep(idx, "subject", e.target.value)} className={inputClass} />
+                                </div>
+                                {idx > 0 && (
+                                  <div>
+                                    <label className={labelClass}>Aguardar (Horas)</label>
+                                    <input type="number" min={0} value={step.delayHours} onChange={(e) => updateStep(idx, "delayHours", parseInt(e.target.value) || 0)} className={inputClass} />
+                                  </div>
+                                )}
+                              </div>
+                              <button type="button" onClick={() => { setEditingVariant("A"); setEditingStepIndex(idx); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-primary-500/30 bg-primary-500/5 text-primary-400 font-bold text-xs">
+                                <Layout className="h-4 w-4" /> {step.design ? 'Editar Design HTML' : 'Criar Design HTML'}
+                              </button>
+                            </div>
+
+                            {step.isABTest && (
+                              <div className="pt-4 border-t border-surface-800/40 space-y-4">
+                                <label className={labelClass}>Assunto Variante B *</label>
+                                <input required value={step.subjectB} onChange={(e) => updateStep(idx, "subjectB", e.target.value)} className={inputClass} />
+                                <button type="button" onClick={() => { setEditingVariant("B"); setEditingStepIndex(idx); }} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-violet-500/30 bg-violet-500/5 text-violet-400 font-bold text-xs">
+                                  <Layout className="h-4 w-4" /> {step.designB ? 'Editar Design B' : 'Criar Design B'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
+                </div>
+              );
+            })}
 
-          <button type="button" onClick={addStep} className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-surface-800 py-6 text-sm font-medium text-surface-500 hover:border-primary-500/30 hover:bg-primary-500/5 hover:text-primary-400 transition-all group">
-            <Plus className="h-5 w-5" /> Adicionar Próxima Etapa
-          </button>
-        </div>
-
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-950/80 backdrop-blur-md border-t border-surface-800 py-4 px-6">
-          <div className="mx-auto max-w-4xl flex justify-end">
-            <button 
-              type="submit" 
-              disabled={isPending || steps.some(s => !s.subject || (s.isABTest && !s.subjectB))} 
-              className="flex items-center justify-center gap-3 rounded-lg bg-primary-600 px-8 py-3 text-base font-bold text-white shadow-xl shadow-primary-600/20 hover:bg-primary-500 transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              {isPending ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Save className="h-5 w-5" /> Salvar Alterações</>}
+            <button type="button" onClick={addStep} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-800 py-4 text-xs font-bold text-surface-500 hover:border-primary-500/30 hover:text-primary-400 transition-all">
+              <Plus className="h-4 w-4" /> Adicionar Etapa
             </button>
           </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-950/90 backdrop-blur-xl border-t border-surface-800/40 py-3 px-4 flex justify-end">
+          <button type="submit" disabled={isPending} className="btn btn-primary !px-8 !py-2.5">
+            {isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</> : <><Save className="h-4 w-4" /> Salvar Alterações</>}
+          </button>
         </div>
       </form>
     </div>
   );
 }
-
-const Save = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-);
