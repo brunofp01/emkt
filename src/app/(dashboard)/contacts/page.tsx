@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import { getContacts } from "@/features/contacts/lib/queries";
 import { getCampaigns } from "@/features/campaigns/lib/queries";
 import { ContactTable } from "@/features/contacts/components/contact-table";
-import type { EmailProvider, ContactStatus } from "@prisma/client";
+import type { ContactStatus } from "@prisma/client";
+
+import { supabaseAdmin } from "@/shared/lib/supabase";
 
 interface ContactsPageProps {
   searchParams: Promise<{
@@ -16,15 +18,16 @@ interface ContactsPageProps {
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
   const params = await searchParams;
   
-  // Buscar contatos e campanhas em paralelo
-  const [contactsResult, campaigns] = await Promise.all([
+  // Buscar contatos, campanhas e provedores em paralelo
+  const [contactsResult, campaigns, { data: providers }] = await Promise.all([
     getContacts({
       search: params.search,
-      provider: params.provider as EmailProvider | undefined,
+      provider: params.provider,
       status: params.status as ContactStatus | undefined,
       page: params.page ? parseInt(params.page) : 1,
     }),
-    getCampaigns()
+    getCampaigns(),
+    supabaseAdmin.from('ProviderConfig').select('provider, providerType').eq('isActive', true)
   ]);
 
   const { contacts, total, page, totalPages } = contactsResult;
@@ -45,6 +48,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           page={page}
           totalPages={totalPages}
           campaigns={campaigns.map(c => ({ id: c.id, name: c.name }))}
+          activeProviders={providers?.map(p => ({ id: p.provider, type: p.providerType })) || []}
         />
       </Suspense>
     </div>

@@ -15,6 +15,7 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
+  Server,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
@@ -24,7 +25,7 @@ const navItems = [
   { href: "/contacts", label: "Contatos", icon: Users },
   { href: "/campaigns", label: "Campanhas", icon: Mail },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/settings", label: "Configurações", icon: Settings },
+  { href: "/settings/providers", label: "Provedores", icon: Server },
 ] as const;
 
 export function Sidebar({ 

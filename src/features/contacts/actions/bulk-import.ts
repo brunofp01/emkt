@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { assignProvidersToContacts } from "@/features/email/lib/provider-selector";
 import { addContactsToCampaign } from "@/features/campaigns/actions/create-campaign";
-import type { EmailProvider } from "@/shared/types";
 
 interface ImportContact {
   email: string;

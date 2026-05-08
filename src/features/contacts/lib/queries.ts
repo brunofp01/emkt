@@ -3,11 +3,11 @@
  * Refatorado para máxima estabilidade e Segmentação Dinâmica (Fase 6).
  */
 import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
-import type { EmailProvider, ContactStatus } from "@/shared/types";
+import type { ContactStatus } from "@/shared/types";
 
 export interface ContactFilters {
   search?: string;
-  provider?: EmailProvider;
+  provider?: string;
   status?: ContactStatus;
   tag?: string;
   page?: number;

@@ -4,34 +4,42 @@
  * Este é o ponto central de roteamento: dado um EmailProvider,
  * retorna a implementação correta para envio de email.
  */
-import type { EmailProvider, EmailProviderAdapter } from "@/shared/types";
-import { resendProvider } from "./resend";
-import { usesendProvider } from "./usesend";
+import type { EmailProviderAdapter } from "@/shared/types";
 import { brevoProvider } from "./brevo";
-import { mailgunProvider } from "./mailgun";
-import { gmailProvider } from "./gmail";
-
-const providers: Record<EmailProvider, EmailProviderAdapter> = {
-  RESEND: resendProvider,
-  USESEND: usesendProvider,
-  BREVO: brevoProvider,
-  MAILGUN: mailgunProvider,
-  GMAIL: gmailProvider,
-};
+import { createSmtpProvider } from "./smtp";
+import { supabaseAdmin } from "@/shared/lib/supabase";
 
 /**
- * Retorna o adaptador de email correto para o provedor informado.
- * @throws Error se o provedor não for suportado
+ * Retorna o adaptador de email correto baseado na configuração do provedor no banco.
+ * Para APIs como o Brevo, retorna a instância estática.
+ * Para contas SMTP, cria uma instância dinamicamente usando as credenciais.
  */
-export function getEmailProvider(provider: EmailProvider): EmailProviderAdapter {
-  const adapter = providers[provider];
-  if (!adapter) {
-    throw new Error(`Provedor de email não suportado: ${provider}`);
-  }
-  return adapter;
-}
+export async function getEmailProvider(providerId: string): Promise<EmailProviderAdapter> {
+  const { data: config } = await supabaseAdmin
+    .from('ProviderConfig')
+    .select('*')
+    .eq('provider', providerId)
+    .single();
 
-/** Lista todos os provedores disponíveis */
-export function getAllProviders(): EmailProviderAdapter[] {
-  return Object.values(providers);
+  if (!config) {
+    throw new Error(`Configuração não encontrada para o provedor: ${providerId}`);
+  }
+
+  // Se for o Brevo (API fixo que restou)
+  if (config.providerType === "API_BREVO") {
+    return brevoProvider;
+  }
+
+  // Para qualquer outro, assumimos que é SMTP
+  if (config.providerType === "SMTP" && config.smtpHost && config.smtpUser && config.smtpPass) {
+    return createSmtpProvider(
+      providerId,
+      config.smtpHost,
+      config.smtpPort || 587,
+      config.smtpUser,
+      config.smtpPass
+    );
+  }
+
+  throw new Error(`Tipo de provedor não suportado ou credenciais ausentes: ${config.providerType}`);
 }

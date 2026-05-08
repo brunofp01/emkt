@@ -3,10 +3,10 @@
 import { useActionState } from "react";
 import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity, Edit2, Server } from "lucide-react";
 import { createContact, updateContact, type CreateContactState } from "@/features/contacts/actions/create-contact";
-import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 
 interface ContactFormProps {
   campaigns: Array<{ id: string; name: string }>;
+  activeProviders?: Array<{ id: string; type: string }>;
   onClose: () => void;
   initialData?: {
     id: string;
@@ -20,7 +20,7 @@ interface ContactFormProps {
   };
 }
 
-export function ContactForm({ onClose, campaigns, initialData }: ContactFormProps) {
+export function ContactForm({ onClose, campaigns, activeProviders = [], initialData }: ContactFormProps) {
   const isEditing = !!initialData;
   const [state, formAction, isPending] = useActionState<CreateContactState, FormData>(
     isEditing ? updateContact : createContact,
@@ -127,10 +127,8 @@ export function ContactForm({ onClose, campaigns, initialData }: ContactFormProp
                   <Server className={iconClass} />
                   <select id="contact-provider" name="provider" className={inputClass} defaultValue={initialData?.provider ?? ""}>
                     {!isEditing && <option value="">Automático (Fila Ordenada)</option>}
-                    {Object.entries(PROVIDER_LABELS)
-                      .filter(([key]) => key !== 'USESEND')
-                      .map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
+                    {activeProviders.map((p) => (
+                      <option key={p.id} value={p.id}>{p.id} ({p.type === 'SMTP' ? 'SMTP' : 'API'})</option>
                     ))}
                   </select>
                 </div>

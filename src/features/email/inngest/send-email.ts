@@ -106,7 +106,7 @@ export const sendEmail = inngest.createFunction(
 
     // 3. Disparo via SDK do Provedor
     const result = await step.run("send-via-provider", async () => {
-      const provider = getEmailProvider(contact.provider);
+      const provider = await getEmailProvider(contact.provider);
       return provider.send({
         to: contact.email,
         from: providerConfig.fromEmail,

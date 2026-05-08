@@ -17,7 +17,7 @@ model Contact {
   company          String?
   phone            String?
   tags             String[]          @default([])
-  provider         EmailProvider
+  provider         String
   status           ContactStatus     @default(ACTIVE)
   metadata         Json?
   createdAt        DateTime          @default(now())
@@ -101,7 +101,7 @@ model EmailEvent {
   contactId    String
   externalId   String         @unique
   messageId    String
-  provider     EmailProvider
+  provider     String
   eventType    EmailEventType
   ip           String?
   userAgent    String?
@@ -124,24 +124,21 @@ model EmailEvent {
 /// Controla pesos de distribuição, limites e status de cada provedor.
 model ProviderConfig {
   id          String        @id @default(cuid())
-  provider    EmailProvider @unique
+  provider    String        @unique
+  providerType String       @default("SMTP")
   weight      Int           @default(25)
   dailyLimit  Int           @default(100)
   sentToday   Int           @default(0)
   isActive    Boolean       @default(true)
   fromEmail   String
   fromName    String
+  smtpHost    String?
+  smtpUser    String?
+  smtpPass    String?
+  smtpPort    Int?          @default(587)
   lastResetAt DateTime      @default(now())
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-}
-
-enum EmailProvider {
-  RESEND
-  USESEND
-  BREVO
-  MAILGUN
-  GMAIL
 }
 
 enum ContactStatus {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { PROVIDER_LABELS, PROVIDER_COLORS, STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
+import { STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { Tag, Building2, User, ChevronRight, Activity, Calendar, MoreHorizontal, Trash2, Edit2, Loader2 } from "lucide-react";
@@ -27,14 +27,15 @@ interface ContactTableRowProps {
     emailEvents: Array<{ eventType: string; timestamp: Date }>;
   };
   campaigns: Array<{ id: string; name: string }>;
+  activeProviders: Array<{ id: string; type: string }>;
 }
 
-export function ContactTableRow({ contact, campaigns }: ContactTableRowProps) {
+export function ContactTableRow({ contact, campaigns, activeProviders }: ContactTableRowProps) {
   const [showEditForm, setShowEditForm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const providerLabel = PROVIDER_LABELS[contact.provider as keyof typeof PROVIDER_LABELS] ?? contact.provider;
-  const providerColor = PROVIDER_COLORS[contact.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
+  const providerLabel = contact.provider;
+  const providerColor = "#6b7280"; // fallback color since it's dynamic now
   const campaign = contact.campaignContacts[0];
   const lastEvent = contact.emailEvents[0];
 
@@ -156,6 +157,7 @@ export function ContactTableRow({ contact, campaigns }: ContactTableRowProps) {
         <ContactForm 
           onClose={() => setShowEditForm(false)} 
           campaigns={campaigns} 
+          activeProviders={activeProviders}
           initialData={{
             id: contact.id,
             email: contact.email,

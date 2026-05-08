@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { getDashboardStats } from "@/features/analytics/lib/queries";
 import { formatDate, calcPercentage } from "@/shared/lib/utils";
-import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { DashboardCharts } from "@/features/analytics/components/dashboard-charts";
 
@@ -126,7 +125,7 @@ export default async function DashboardPage() {
             <div className="space-y-5">
               {stats.providerCounts.map((p) => {
                 const percentage = calcPercentage(p.count, stats.totalContacts);
-                const providerColor = PROVIDER_COLORS[p.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
+                const providerColor = "#3b82f6"; // Default blue
                 return (
                   <div key={p.provider} className="group">
                     <div className="mb-2 flex items-center justify-between">
@@ -136,7 +135,7 @@ export default async function DashboardPage() {
                           style={{ backgroundColor: providerColor }}
                         />
                         <span className="text-xs font-bold text-surface-300">
-                          {PROVIDER_LABELS[p.provider as keyof typeof PROVIDER_LABELS]}
+                          {p.provider}
                         </span>
                       </div>
                       <span className="text-xs text-surface-500 font-mono">

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getContactById } from "@/features/contacts/lib/queries";
-import { PROVIDER_LABELS, PROVIDER_COLORS, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, STEP_STATUS_LABELS } from "@/shared/lib/constants";
+import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, STEP_STATUS_LABELS } from "@/shared/lib/constants";
 import { formatDate, formatRelativeDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { ArrowLeft, Mail, Clock, Globe, MousePointerClick, Monitor } from "lucide-react";
@@ -15,8 +15,8 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
   const contact = await getContactById(id);
   if (!contact) notFound();
 
-  const providerLabel = PROVIDER_LABELS[contact.provider as keyof typeof PROVIDER_LABELS];
-  const providerColor = PROVIDER_COLORS[contact.provider as keyof typeof PROVIDER_COLORS];
+  const providerLabel = contact.provider;
+  const providerColor = "#3b82f6";
 
   return (
     <div className="space-y-6 animate-fade-in">

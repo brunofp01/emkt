@@ -1,39 +1,33 @@
 /**
- * Provider Selector — Fila Ordenada Fixa: BREVO → RESEND → MAILGUN
- * Cada novo contato recebe o próximo provedor da fila, ciclicamente.
+ * Provider Selector — Balanceador Dinâmico (Fase 8)
+ * O sistema busca os provedores ativos no banco de dados e distribui contatos
+ * de forma circular entre eles. Suporta contas infinitas (ex: múltiplos Gmails).
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
-import type { EmailProvider } from "@/shared/types";
 
 /**
- * Ordem fixa dos provedores. O sistema percorre essa fila ciclicamente.
- * Para adicionar/remover um provedor, basta editar esta lista.
+ * Busca a lista de IDs dos provedores ativos no banco.
+ * A ordem é determinada pelo ID ou Data de Criação, garantindo determinismo.
  */
-const PROVIDER_ORDER: EmailProvider[] = ["BREVO", "RESEND", "MAILGUN", "GMAIL"];
-
-/**
- * Busca a lista de provedores ativos no banco e retorna apenas os que
- * estão na fila E estão ativos, preservando a ordem de PROVIDER_ORDER.
- */
-async function getActiveOrderedProviders(): Promise<EmailProvider[]> {
+async function getActiveOrderedProviders(): Promise<string[]> {
   const { data: configs, error } = await supabaseAdmin
     .from('ProviderConfig')
     .select('provider')
-    .eq('isActive', true);
+    .eq('isActive', true)
+    .order('createdAt', { ascending: true });
 
   if (error) throw error;
   if (!configs || configs.length === 0) {
     throw new Error("Nenhum provedor de email ativo no banco (tabela ProviderConfig).");
   }
 
-  const activeSet = new Set(configs.map(c => c.provider));
-  return PROVIDER_ORDER.filter(p => activeSet.has(p));
+  return configs.map(c => c.provider);
 }
 
 /**
  * Conta quantos contatos já existem para cada provedor ativo.
  */
-async function getProviderCounts(providers: EmailProvider[]): Promise<Map<string, number>> {
+async function getProviderCounts(providers: string[]): Promise<Map<string, number>> {
   const countMap = new Map<string, number>();
   
   // Inicializa todos com 0
@@ -56,66 +50,53 @@ async function getProviderCounts(providers: EmailProvider[]): Promise<Map<string
 /**
  * Seleciona o próximo provedor da fila ordenada.
  * Conta quantos contatos existem no total e pega o próximo da fila.
- * Ex: Se temos 5 contatos e 3 provedores, o próximo é o índice 5 % 3 = 2 (MAILGUN).
  */
-export async function selectProviderForNewContact(): Promise<EmailProvider> {
+export async function selectProviderForNewContact(): Promise<string> {
   const orderedProviders = await getActiveOrderedProviders();
   const countMap = await getProviderCounts(orderedProviders);
 
-  // Total de contatos já distribuídos
   let totalContacts = 0;
   countMap.forEach(count => totalContacts += count);
 
-  // O próximo provedor é o que está na posição (totalContacts % numProviders)
   const nextIndex = totalContacts % orderedProviders.length;
   const selected = orderedProviders[nextIndex];
 
-  console.log(`[ProviderSelector] Total contatos: ${totalContacts}, Próximo índice: ${nextIndex}, Selecionado: ${selected}`);
-  console.log(`[ProviderSelector] Distribuição atual:`, Object.fromEntries(countMap));
-
+  console.log(`[ProviderSelector] Total contatos: ${totalContacts}, Próximo: ${nextIndex}, Selecionado: ${selected}`);
   return selected;
 }
 
 /**
  * Distribui N provedores para um lote de contatos em fila ordenada.
- * Ex: Para 6 contatos: BREVO, RESEND, MAILGUN, BREVO, RESEND, MAILGUN
  */
-export async function assignProvidersToContacts(count: number): Promise<EmailProvider[]> {
+export async function assignProvidersToContacts(count: number): Promise<string[]> {
   const orderedProviders = await getActiveOrderedProviders();
   const countMap = await getProviderCounts(orderedProviders);
 
   let totalContacts = 0;
   countMap.forEach(c => totalContacts += c);
 
-  const results: EmailProvider[] = [];
+  const results: string[] = [];
   for (let i = 0; i < count; i++) {
     const index = (totalContacts + i) % orderedProviders.length;
     results.push(orderedProviders[index]);
   }
 
-  console.log(`[ProviderSelector] Lote de ${count} contatos distribuído:`, results);
+  console.log(`[ProviderSelector] Lote de ${count} contatos distribuído.`);
   return results;
 }
 
 /**
  * Verifica limites diários com reset automático.
  */
-export async function canProviderSendToday(provider: EmailProvider): Promise<boolean> {
+export async function canProviderSendToday(provider: string): Promise<boolean> {
   const { data: config, error } = await supabaseAdmin
     .from('ProviderConfig')
     .select('*')
     .eq('provider', provider)
     .single();
 
-  if (error || !config) {
-    console.error("[canProviderSendToday] Error or config not found:", error, "Provider:", provider);
-    return false;
-  }
-  
-  if (!config.isActive) {
-    console.log(`[canProviderSendToday] Provider ${provider} is not active.`);
-    return false;
-  }
+  if (error || !config) return false;
+  if (!config.isActive) return false;
 
   const now = new Date();
   const lastReset = new Date(config.lastResetAt);
@@ -135,14 +116,12 @@ export async function canProviderSendToday(provider: EmailProvider): Promise<boo
 /**
  * Incremento ATÔMICO via RPC (Evita Race Conditions).
  */
-export async function incrementProviderSendCount(provider: EmailProvider): Promise<void> {
+export async function incrementProviderSendCount(provider: string): Promise<void> {
   const { error } = await supabaseAdmin.rpc('increment_provider_count', { 
     provider_name: provider 
   });
 
-  // Fallback caso o RPC não exista
   if (error) {
-    console.warn("RPC increment_provider_count não encontrado, usando fallback não-atômico.");
     const { data: config } = await supabaseAdmin
       .from('ProviderConfig')
       .select('sentToday')

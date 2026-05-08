@@ -2,23 +2,7 @@
  * Constantes da aplicação.
  */
 
-/** Mapeamento de provedores para labels amigáveis */
-export const PROVIDER_LABELS = {
-  RESEND: "Resend",
-  USESEND: "useSend",
-  BREVO: "Brevo",
-  MAILGUN: "Mailgun",
-  GMAIL: "Gmail",
-} as const;
 
-/** Cores associadas a cada provedor para o dashboard */
-export const PROVIDER_COLORS = {
-  RESEND: "#6366f1",   // Indigo
-  USESEND: "#8b5cf6",  // Violet
-  BREVO: "#06b6d4",    // Cyan
-  MAILGUN: "#f43f5e",  // Rose
-  GMAIL: "#ea4335",    // Google Red
-} as const;
 
 /** Mapeamento de status de contato para labels */
 export const CONTACT_STATUS_LABELS = {

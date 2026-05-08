@@ -32,9 +32,10 @@ interface ContactTableProps {
   page: number;
   totalPages: number;
   campaigns: Array<{ id: string; name: string }>;
+  activeProviders: Array<{ id: string; type: string }>;
 }
 
-export function ContactTable({ contacts, total, page, totalPages, campaigns }: ContactTableProps) {
+export function ContactTable({ contacts, total, page, totalPages, campaigns, activeProviders }: ContactTableProps) {
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const router = useRouter();
@@ -68,7 +69,7 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns }: C
 
   return (
     <>
-      {showForm && <ContactForm campaigns={campaigns} onClose={() => setShowForm(false)} />}
+      {showForm && <ContactForm campaigns={campaigns} activeProviders={activeProviders} onClose={() => setShowForm(false)} />}
       {showImport && <ImportModal campaigns={campaigns} onClose={() => setShowImport(false)} />}
 
       <div className="space-y-6">
@@ -162,7 +163,7 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns }: C
                   </tr>
                 ) : (
                   contacts.map((contact) => (
-                    <ContactTableRow key={contact.id} contact={contact} campaigns={campaigns} />
+                    <ContactTableRow key={contact.id} contact={contact} campaigns={campaigns} activeProviders={activeProviders} />
                   ))
                 )}
               </tbody>

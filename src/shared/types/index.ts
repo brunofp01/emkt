@@ -2,9 +2,9 @@
  * Shared types da aplicação.
  * Tipos inferidos do Prisma + tipos auxiliares.
  */
-import type { EmailProvider, EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus } from "@prisma/client";
+import type { EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus } from "@prisma/client";
 
-export type { EmailProvider, EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus };
+export type { EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus };
 
 /** Resultado padronizado de envio de email por qualquer provedor */
 export interface SendEmailResult {
@@ -27,7 +27,7 @@ export interface SendEmailParams {
 
 /** Interface que todo provedor de email deve implementar */
 export interface EmailProviderAdapter {
-  readonly name: EmailProvider;
+  readonly name: string;
   send(params: SendEmailParams): Promise<SendEmailResult>;
 }
 
@@ -88,7 +88,7 @@ export interface DashboardStats {
 
 /** Estatísticas por provedor */
 export interface ProviderStats {
-  provider: EmailProvider;
+  provider: string;
   contacts: number;
   sent: number;
   delivered: number;

@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic";
 
 import { Settings, Mail, Shield, Bell, Database, Zap, CheckCircle2, XCircle } from "lucide-react";
 import { supabaseAdmin } from "@/shared/lib/supabase";
-import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 import { SetupProvidersButton } from "@/features/email/components/setup-providers-button";
 import { ProviderToggle } from "@/features/email/components/provider-toggle";
 
@@ -51,8 +50,8 @@ export default async function SettingsPage() {
         {hasProviders ? (
           <div className="space-y-4">
             {providers.map((provider: any) => {
-              const color = PROVIDER_COLORS[provider.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
-              const label = PROVIDER_LABELS[provider.provider as keyof typeof PROVIDER_LABELS] ?? provider.provider;
+              const color = "#3b82f6";
+              const label = provider.provider;
               const usagePct = provider.dailyLimit > 0 ? Math.round((provider.sentToday / provider.dailyLimit) * 100) : 0;
               
               return (

@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { getDashboardStats } from "@/features/analytics/lib/queries";
-import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 import { calcPercentage } from "@/shared/lib/utils";
 import { BarChart3, TrendingUp, Users, Mail, PieChart, Info } from "lucide-react";
 import { DashboardCharts } from "@/features/analytics/components/dashboard-charts";
@@ -54,12 +53,12 @@ export default async function AnalyticsPage() {
           <div className="space-y-5">
             {stats.providerCounts.map((p) => {
               const percentage = calcPercentage(p.count, stats.totalContacts);
-              const providerColor = PROVIDER_COLORS[p.provider as keyof typeof PROVIDER_COLORS] ?? "#6b7280";
+              const providerColor = "#3b82f6";
               return (
                 <div key={p.provider} className="group">
                   <div className="mb-2 flex items-center justify-between text-xs">
                     <span className="font-bold text-surface-300">
-                      {PROVIDER_LABELS[p.provider as keyof typeof PROVIDER_LABELS] ?? p.provider}
+                      {p.provider}
                     </span>
                     <span className="text-surface-500 font-mono">{p.count} ({percentage}%)</span>
                   </div>
