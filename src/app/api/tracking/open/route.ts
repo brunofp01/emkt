@@ -1,6 +1,7 @@
 /**
  * Tracking Pixel — Open (Hardened)
- * Retorna uma imagem 1x1 transparente e registra o evento.
+ * Retorna uma imagem 1x1 transparente e registra o evento de abertura.
+ * Atualiza o stepStatus do CampaignContact na hierarquia correta.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
@@ -33,7 +34,8 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (!ccError && cc) {
-      const provider = (cc as any).contact?.provider || 'RESEND';
+      const provider = (cc as any).contact?.provider || 'SMTP';
+      const now = new Date().toISOString();
 
       // 2. Registrar evento de abertura
       await supabaseAdmin.from('EmailEvent').insert({
@@ -43,24 +45,36 @@ export async function GET(req: NextRequest) {
         messageId: cc.lastMessageId || 'pixel-open',
         provider: provider,
         eventType: "OPENED",
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         userAgent: req.headers.get("user-agent") || null,
         ip: req.headers.get("x-forwarded-for")?.split(",")[0] || null,
       });
 
-      // 3. Atualizar status se ainda não estiver como aberto/clicado
-      if (cc.stepStatus === 'SENT' || cc.stepStatus === 'DELIVERED') {
+      // 3. Atualizar stepStatus para OPENED se estiver em um status inferior
+      // Hierarquia: QUEUED < SENDING < SENT < DELIVERED < OPENED < CLICKED
+      // Nunca retroceder: se já está como CLICKED, não voltar para OPENED
+      const promotableStatuses = ['QUEUED', 'SENDING', 'SENT', 'DELIVERED'];
+      if (promotableStatuses.includes(cc.stepStatus)) {
         await supabaseAdmin
           .from('CampaignContact')
-          .update({ stepStatus: 'OPENED', lastOpenedAt: new Date().toISOString() })
+          .update({ 
+            stepStatus: 'OPENED', 
+            lastOpenedAt: now,
+            updatedAt: now 
+          })
           .eq('id', campaignContactId);
       }
 
       // 4. Notificar Inngest para disparar próximas etapas
-      await inngest.send({
-        name: "email/opened",
-        data: { contactId: cc.contactId, campaignContactId },
-      });
+      try {
+        await inngest.send({
+          name: "email/opened",
+          data: { contactId: cc.contactId, campaignContactId },
+        });
+      } catch (inngestErr) {
+        // Não bloquear o tracking se o Inngest falhar
+        console.error("[Tracking Open] Inngest error:", inngestErr);
+      }
     }
   } catch (err) {
     console.error("[Tracking Open Error]", err);

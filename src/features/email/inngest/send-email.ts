@@ -229,19 +229,25 @@ export const sendEmail = inngest.createFunction(
     // 9. Persistência de Resultados + Tracking de Reputação
     await step.run("finalize-send", async () => {
       const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const now = new Date().toISOString();
       
-      await Promise.all([
+      // Para provedores SMTP (Gmail), aceitar o email = entrega confirmada.
+      // Não temos webhook de delivery como APIs (Brevo/Resend), então auto-promovemos.
+      const isSMTP = providerConfig?.providerType === 'SMTP';
+      const finalStatus = isSMTP ? "DELIVERED" : "SENT";
+      
+      const operations = [
         // Atualizar status do CampaignContact
         supabaseAdmin
           .from('CampaignContact')
           .update({
-            stepStatus: "SENT",
+            stepStatus: finalStatus,
             lastMessageId: result.messageId,
-            lastSentAt: new Date().toISOString(),
+            lastSentAt: now,
           })
           .eq('id', campaignContactId),
         
-        // Registrar evento SENT na tabela EmailEvent (independente de webhook)
+        // Registrar evento SENT
         supabaseAdmin.from('EmailEvent').insert({
           id: generateId(),
           externalId: result.messageId || `sent_${campaignContactId}_${Date.now()}`,
@@ -249,7 +255,7 @@ export const sendEmail = inngest.createFunction(
           messageId: result.messageId || 'direct-send',
           provider: contact.provider,
           eventType: "SENT",
-          timestamp: new Date().toISOString(),
+          timestamp: now,
         }),
         
         // Incrementar contador diário
@@ -257,7 +263,24 @@ export const sendEmail = inngest.createFunction(
         
         // Registrar envio bem-sucedido no warmup engine
         recordSendResult(contact.provider, "sent"),
-      ]);
+      ];
+
+      // Para SMTP, registrar também evento DELIVERED automaticamente
+      if (isSMTP) {
+        operations.push(
+          supabaseAdmin.from('EmailEvent').insert({
+            id: generateId(),
+            externalId: `delivered_${campaignContactId}_${Date.now()}`,
+            contactId: contact.id,
+            messageId: result.messageId || 'direct-send',
+            provider: contact.provider,
+            eventType: "DELIVERED",
+            timestamp: now,
+          })
+        );
+      }
+
+      await Promise.all(operations);
     });
 
     return { 

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Play, Pause, RotateCcw, Users, Mail, BarChart3, Clock, Send, CheckCircle2, Eye } from "lucide-react";
+import { ArrowLeft, Play, Pause, RotateCcw, Users, Mail, BarChart3, Clock, Send, CheckCircle2, Eye, MousePointerClick } from "lucide-react";
 import { getCampaignById } from "@/features/campaigns/lib/queries";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { CAMPAIGN_STATUS_LABELS, STEP_STATUS_LABELS } from "@/shared/lib/constants";
@@ -39,8 +39,9 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       sent: 0,
       delivered: 0,
       opened: 0,
-      variantA: { sent: 0, delivered: 0, opened: 0, total: 0 },
-      variantB: { sent: 0, delivered: 0, opened: 0, total: 0 },
+      clicked: 0,
+      variantA: { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 },
+      variantB: { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 },
     }));
   }
 
@@ -59,13 +60,14 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
   const isSent = (status: string) => (statusHierarchy[status] ?? 0) >= 2;
   const isDelivered = (status: string) => (statusHierarchy[status] ?? 0) >= 3;
   const isOpened = (status: string) => (statusHierarchy[status] ?? 0) >= 4;
+  const isClicked = (status: string) => (statusHierarchy[status] ?? 0) >= 5;
 
   // Ordenar etapas por stepOrder para determinar a progressão
   const sortedSteps = [...steps].sort((a: any, b: any) => a.stepOrder - b.stepOrder);
 
   return sortedSteps.map((step: any) => {
-    let variantA = { sent: 0, delivered: 0, opened: 0, total: 0 };
-    let variantB = { sent: 0, delivered: 0, opened: 0, total: 0 };
+    let variantA = { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
+    let variantB = { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
 
     // Para cada etapa, analisamos os contatos que estão NAQUELA etapa ou já passaram por ela
     // Na etapa 1, todos os contatos participam
@@ -90,11 +92,13 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
         target.sent += 1;
         target.delivered += 1;
         target.opened += 1; // Se avançou, é porque abriu
+        target.clicked += 1;
       } else if (contactStepOrder === step.stepOrder) {
         // Está nesta etapa - usar o stepStatus atual
         if (isSent(c.stepStatus)) target.sent += 1;
         if (isDelivered(c.stepStatus)) target.delivered += 1;
         if (isOpened(c.stepStatus)) target.opened += 1;
+        if (isClicked(c.stepStatus)) target.clicked += 1;
       }
     });
 
@@ -109,6 +113,7 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       sent: variantA.sent + variantB.sent,
       delivered: variantA.delivered + variantB.delivered,
       opened: variantA.opened + variantB.opened,
+      clicked: variantA.clicked + variantB.clicked,
       variantA,
       variantB,
     };
@@ -198,6 +203,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             const sentPct = metric.total > 0 ? Math.round((metric.sent / metric.total) * 100) : 0;
             const deliveredPct = metric.total > 0 ? Math.round((metric.delivered / metric.total) * 100) : 0;
             const openedPct = metric.total > 0 ? Math.round((metric.opened / metric.total) * 100) : 0;
+            const clickedPct = metric.total > 0 ? Math.round((metric.clicked / metric.total) * 100) : 0;
 
             return (
               <div key={metric.stepId} className="p-4 rounded-xl bg-surface-900/30 border border-surface-800/50">
@@ -257,6 +263,19 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                         </div>
                         <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
                           <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${openedPct}%`, boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)' }} />
+                        </div>
+                      </div>
+
+                      {/* Barra de Cliques (Simples) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-surface-500 flex items-center gap-1.5">
+                            <MousePointerClick className="h-3 w-3 text-violet-400" /> Cliques
+                          </span>
+                          <span className="text-[10px] font-mono text-surface-400">{metric.clicked}/{metric.total} ({clickedPct}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-surface-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-violet-500 rounded-full transition-all duration-1000" style={{ width: `${clickedPct}%`, boxShadow: '0 0 8px rgba(139, 92, 246, 0.3)' }} />
                         </div>
                       </div>
                     </>

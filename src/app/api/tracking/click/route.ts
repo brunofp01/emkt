@@ -1,6 +1,6 @@
 /**
  * Tracking Proxy — Click (Hardened)
- * Decodifica URL Base64, registra evento e redireciona.
+ * Decodifica URL Base64, registra evento, atualiza status e redireciona.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
@@ -26,16 +26,16 @@ export async function GET(req: NextRequest) {
     // 1. Buscar vínculo da campanha via Admin (Bypass RLS)
     const { data: cc, error: ccError } = await supabaseAdmin
       .from('CampaignContact')
-      .select('contactId, lastMessageId, contact:Contact(provider, tags)')
+      .select('contactId, lastMessageId, stepStatus, contact:Contact(provider, tags)')
       .eq('id', campaignContactId)
       .single();
 
     if (!ccError && cc) {
       const contact = (cc as any).contact;
-      const provider = contact?.provider || 'RESEND';
+      const provider = contact?.provider || 'SMTP';
       const currentTags = contact?.tags || [];
+      const now = new Date().toISOString();
 
-      // 2. Registrar evento + atualizar tags em paralelo
       const updates: any[] = [
         // Registrar evento de clique
         supabaseAdmin.from('EmailEvent').insert({
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
           provider: provider,
           eventType: "CLICKED",
           clickedUrl: targetUrl,
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           ip: req.headers.get("x-forwarded-for")?.split(",")[0] || null,
           userAgent: req.headers.get("user-agent") || null,
         }),
@@ -61,11 +61,23 @@ export async function GET(req: NextRequest) {
         }),
       ];
 
+      // Atualizar stepStatus para CLICKED (maior que OPENED na hierarquia)
+      // Só promove — nunca retrocede (CLICKED > OPENED > DELIVERED > SENT)
+      const promotableStatuses = ['QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'OPENED'];
+      if (promotableStatuses.includes(cc.stepStatus)) {
+        updates.push(
+          supabaseAdmin
+            .from('CampaignContact')
+            .update({ stepStatus: 'CLICKED', updatedAt: now })
+            .eq('id', campaignContactId)
+        );
+      }
+
       // Adicionar tag CLICKED se não existir
       if (!currentTags.includes('CLICKED')) {
         updates.push(
           supabaseAdmin.from('Contact')
-            .update({ tags: [...currentTags, 'CLICKED'] })
+            .update({ tags: [...currentTags, 'CLICKED'], updatedAt: now })
             .eq('id', cc.contactId)
         );
       }
