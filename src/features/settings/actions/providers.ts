@@ -29,12 +29,14 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
     const data = providerSchema.parse(rawData);
 
     if (data.providerType === "SMTP") {
-      if (!data.smtpHost || !data.smtpUser || !data.smtpPass) {
-        throw new Error("Para provedores SMTP, Host, Usuário e Senha são obrigatórios.");
+      // Se for novo, senha é obrigatória. Se for edição, pode ser vazia.
+      const isNew = !data.id;
+      if (!data.smtpHost || !data.smtpUser || (isNew && !data.smtpPass)) {
+        throw new Error("Para novos provedores SMTP, Host, Usuário e Senha são obrigatórios.");
       }
     }
 
-    const payload = {
+    const payload: any = {
       provider: data.provider,
       providerType: data.providerType,
       fromEmail: data.fromEmail,
@@ -43,9 +45,13 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
       weight: data.weight,
       smtpHost: data.smtpHost || null,
       smtpUser: data.smtpUser || null,
-      smtpPass: data.smtpPass || null,
       smtpPort: data.smtpPort || null,
     };
+
+    // Só atualiza a senha se ela tiver sido informada
+    if (data.smtpPass) {
+      payload.smtpPass = data.smtpPass;
+    }
 
     if (data.id) {
       // Atualiza
