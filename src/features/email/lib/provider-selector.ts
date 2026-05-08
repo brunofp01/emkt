@@ -58,6 +58,53 @@ export async function selectProviderForNewContact(): Promise<EmailProvider> {
 }
 
 /**
+ * Distribui N provedores para um lote de contatos simulando o balanceamento localmente.
+ */
+export async function assignProvidersToContacts(count: number): Promise<EmailProvider[]> {
+  console.log(`[Diagnostic] Distribuindo provedores para ${count} contatos...`);
+  
+  const { data: activeProviders, error: configError } = await supabaseAdmin
+    .from('ProviderConfig')
+    .select('*')
+    .eq('isActive', true);
+
+  if (configError) throw configError;
+  if (!activeProviders || activeProviders.length === 0) {
+    throw new Error("Nenhum provedor de email ativo no banco.");
+  }
+
+  const { data: distribution, error: distError } = await supabaseAdmin.rpc('get_provider_distribution');
+  
+  const countMap = new Map<string, number>();
+  if (!distError && distribution) {
+    distribution.forEach((item: any) => countMap.set(item.provider, Number(item.count)));
+  }
+
+  const results: EmailProvider[] = [];
+  
+  // Simula a adição ao banco localmente para balancear o lote perfeitamente
+  for (let i = 0; i < count; i++) {
+    const candidates = activeProviders.map((config) => {
+      const currentCount = countMap.get(config.provider) ?? 0;
+      const ratio = currentCount / Math.max(config.weight, 1);
+      return {
+        provider: config.provider as EmailProvider,
+        ratio: ratio,
+      };
+    });
+
+    candidates.sort((a, b) => a.ratio - b.ratio);
+    const winner = candidates[0].provider;
+    results.push(winner);
+    
+    // Atualiza o contador local para que o próximo laço veja a mudança
+    countMap.set(winner, (countMap.get(winner) ?? 0) + 1);
+  }
+
+  return results;
+}
+
+/**
  * Verifica limites diários com reset automático.
  */
 export async function canProviderSendToday(provider: EmailProvider): Promise<boolean> {
