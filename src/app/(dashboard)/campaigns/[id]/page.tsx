@@ -58,9 +58,14 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
         const target = isB ? variantB : variantA;
         
         target.total += 1;
-        if (evts.includes('SENT') || evts.includes('DELIVERED')) target.sent += 1;
-        if (evts.includes('DELIVERED')) target.delivered += 1;
-        if (evts.includes('OPENED') || evts.includes('CLICKED')) target.opened += 1;
+        const hasSentEvent = evts.includes('SENT') || evts.includes('DELIVERED');
+        const hasDeliveredEvent = evts.includes('DELIVERED');
+        const hasOpenedEvent = evts.includes('OPENED') || evts.includes('CLICKED');
+
+        // Se o status no contato for SENT, DELIVERED ou OPENED, contamos como enviado
+        if (hasSentEvent || ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)) target.sent += 1;
+        if (hasDeliveredEvent || ['DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)) target.delivered += 1;
+        if (hasOpenedEvent || ['OPENED', 'CLICKED'].includes(c.stepStatus)) target.opened += 1;
       });
     } else {
       contactsInStep.forEach(c => {
