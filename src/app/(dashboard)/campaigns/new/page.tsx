@@ -2,8 +2,7 @@
 
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createCampaign, type CampaignActionState } from "@/features/campaigns/actions/create-campaign";
-import { getAvailableTags } from "@/features/contacts/lib/queries";
+import { createCampaign, type CampaignActionState, getAvailableTags } from "@/features/campaigns/actions/create-campaign";
 import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info, Clock, ArrowDown, Zap, ChevronDown, ChevronUp, Target, Users as UsersIcon, Tag } from "lucide-react";
 import Link from "next/link";
 import { EmailCodeEditor } from "@/features/campaigns/components/email-code-editor";

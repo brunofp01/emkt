@@ -145,6 +145,30 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 }
 
 /**
+ * Busca todas as tags únicas presentes na base de contatos.
+ * Exportado como Server Action para uso no formulário de criação.
+ */
+export async function getAvailableTags() {
+  const { data, error } = await supabase
+    .from('Contact')
+    .select('tags');
+
+  if (error) {
+    console.error('Erro ao buscar tags:', error);
+    return [];
+  }
+
+  const allTags = new Set<string>();
+  data.forEach(item => {
+    if (Array.isArray(item.tags)) {
+      item.tags.forEach(tag => allTags.add(tag));
+    }
+  });
+
+  return Array.from(allTags).sort();
+}
+
+/**
  * Ativa uma campanha e dispara o início para todos os contatos pendentes.
  */
 export async function activateCampaign(campaignId: string): Promise<CampaignActionState> {

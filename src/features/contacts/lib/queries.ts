@@ -1,8 +1,6 @@
 /**
  * Contact queries — Busca de contatos usando o SDK oficial do Supabase.
- * Refatorado para máxima estabilidade e Segmentação Dinâmica (Fase 6).
  */
-"use server";
 
 import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
 import type { ContactStatus } from "@/shared/types";
@@ -121,25 +119,3 @@ export async function getContactCountsByProvider() {
   }));
 }
 
-/**
- * Busca todas as tags únicas presentes na base de contatos.
- */
-export async function getAvailableTags() {
-  const { data, error } = await supabase
-    .from('Contact')
-    .select('tags');
-
-  if (error) {
-    console.error('Erro ao buscar tags:', error);
-    return [];
-  }
-
-  const allTags = new Set<string>();
-  data.forEach(item => {
-    if (Array.isArray(item.tags)) {
-      item.tags.forEach(tag => allTags.add(tag));
-    }
-  });
-
-  return Array.from(allTags).sort();
-}
