@@ -74,6 +74,20 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
     revalidatePath("/contacts");
     return { success: true };
   } catch (err) {
+    console.error('[saveProvider Error]:', err);
+    
+    if (err instanceof z.ZodError) {
+      const firstError = err.errors[0]?.message || "Dados inválidos.";
+      return { error: firstError };
+    }
+    
+    // Erros de banco de dados (ex: Unique constraint)
+    if (typeof err === 'object' && err !== null && 'code' in err) {
+      if ((err as any).code === '23505') {
+        return { error: "Este ID de provedor já está em uso. Por favor, use um nome diferente." };
+      }
+    }
+
     return { error: err instanceof Error ? err.message : "Erro ao salvar provedor." };
   }
 }
