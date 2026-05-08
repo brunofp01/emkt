@@ -1,106 +1,99 @@
 /**
- * Provider Selector — Lógica de Weighted Round-Robin Otimizada (Auditada).
+ * Provider Selector — Fila Ordenada Fixa: BREVO → RESEND → MAILGUN
+ * Cada novo contato recebe o próximo provedor da fila, ciclicamente.
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import type { EmailProvider } from "@/shared/types";
 
 /**
- * Seleciona o melhor provedor usando agregação nativa do banco (O(1)).
+ * Ordem fixa dos provedores. O sistema percorre essa fila ciclicamente.
+ * Para adicionar/remover um provedor, basta editar esta lista.
  */
-export async function selectProviderForNewContact(): Promise<EmailProvider> {
-  console.log('[Diagnostic] Iniciando seleção de provedor...');
-  // 1. Busca provedores ativos
-  const { data: activeProviders, error: configError } = await supabaseAdmin
+const PROVIDER_ORDER: EmailProvider[] = ["BREVO", "RESEND", "MAILGUN"];
+
+/**
+ * Busca a lista de provedores ativos no banco e retorna apenas os que
+ * estão na fila E estão ativos, preservando a ordem de PROVIDER_ORDER.
+ */
+async function getActiveOrderedProviders(): Promise<EmailProvider[]> {
+  const { data: configs, error } = await supabaseAdmin
     .from('ProviderConfig')
-    .select('*')
+    .select('provider')
     .eq('isActive', true);
 
-  if (configError) {
-    console.error('[Diagnostic] Erro ao buscar ProviderConfig:', configError);
-    throw configError;
-  }
-  
-  console.log('[Diagnostic] Provedores ativos encontrados:', activeProviders?.length ?? 0);
-  
-  if (!activeProviders || activeProviders.length === 0) {
+  if (error) throw error;
+  if (!configs || configs.length === 0) {
     throw new Error("Nenhum provedor de email ativo no banco (tabela ProviderConfig).");
   }
 
-  // 2. Busca distribuição via RPC (Agregação no Postgres - Alta Performance)
-  console.log('[Diagnostic] Buscando distribuição via RPC get_provider_distribution...');
-  const { data: distribution, error: distError } = await supabaseAdmin
-    .rpc('get_provider_distribution');
-
-  if (distError) {
-    console.warn('[Diagnostic] RPC get_provider_distribution falhou ou não existe. Usando fallback.', distError);
-  }
-
-  // Fallback caso o RPC não tenha sido criado ainda
-  const countMap = new Map<string, number>();
-  if (!distError && distribution) {
-    distribution.forEach((item: any) => countMap.set(item.provider, Number(item.count)));
-  }
-
-  // 3. Calcula ratio e seleciona o menor
-  const candidates = activeProviders.map((config) => {
-    const currentCount = countMap.get(config.provider) ?? 0;
-    const ratio = currentCount / Math.max(config.weight, 1);
-    console.log(`[Diagnostic] Provedor: ${config.provider}, Peso: ${config.weight}, Atual: ${currentCount}, Ratio: ${ratio}`);
-    return {
-      provider: config.provider as EmailProvider,
-      ratio: ratio,
-    };
-  });
-
-  candidates.sort((a, b) => a.ratio - b.ratio);
-  console.log('[Diagnostic] Vencedor selecionado:', candidates[0].provider);
-  return candidates[0].provider;
+  const activeSet = new Set(configs.map(c => c.provider));
+  return PROVIDER_ORDER.filter(p => activeSet.has(p));
 }
 
 /**
- * Distribui N provedores para um lote de contatos simulando o balanceamento localmente.
+ * Conta quantos contatos já existem para cada provedor ativo.
+ */
+async function getProviderCounts(providers: EmailProvider[]): Promise<Map<string, number>> {
+  const countMap = new Map<string, number>();
+  
+  // Inicializa todos com 0
+  providers.forEach(p => countMap.set(p, 0));
+
+  // Tenta usar RPC primeiro (mais rápido)
+  const { data: distribution, error } = await supabaseAdmin.rpc('get_provider_distribution');
+  
+  if (!error && distribution) {
+    distribution.forEach((item: any) => {
+      if (countMap.has(item.provider)) {
+        countMap.set(item.provider, Number(item.count));
+      }
+    });
+  }
+
+  return countMap;
+}
+
+/**
+ * Seleciona o próximo provedor da fila ordenada.
+ * Conta quantos contatos existem no total e pega o próximo da fila.
+ * Ex: Se temos 5 contatos e 3 provedores, o próximo é o índice 5 % 3 = 2 (MAILGUN).
+ */
+export async function selectProviderForNewContact(): Promise<EmailProvider> {
+  const orderedProviders = await getActiveOrderedProviders();
+  const countMap = await getProviderCounts(orderedProviders);
+
+  // Total de contatos já distribuídos
+  let totalContacts = 0;
+  countMap.forEach(count => totalContacts += count);
+
+  // O próximo provedor é o que está na posição (totalContacts % numProviders)
+  const nextIndex = totalContacts % orderedProviders.length;
+  const selected = orderedProviders[nextIndex];
+
+  console.log(`[ProviderSelector] Total contatos: ${totalContacts}, Próximo índice: ${nextIndex}, Selecionado: ${selected}`);
+  console.log(`[ProviderSelector] Distribuição atual:`, Object.fromEntries(countMap));
+
+  return selected;
+}
+
+/**
+ * Distribui N provedores para um lote de contatos em fila ordenada.
+ * Ex: Para 6 contatos: BREVO, RESEND, MAILGUN, BREVO, RESEND, MAILGUN
  */
 export async function assignProvidersToContacts(count: number): Promise<EmailProvider[]> {
-  console.log(`[Diagnostic] Distribuindo provedores para ${count} contatos...`);
-  
-  const { data: activeProviders, error: configError } = await supabaseAdmin
-    .from('ProviderConfig')
-    .select('*')
-    .eq('isActive', true);
+  const orderedProviders = await getActiveOrderedProviders();
+  const countMap = await getProviderCounts(orderedProviders);
 
-  if (configError) throw configError;
-  if (!activeProviders || activeProviders.length === 0) {
-    throw new Error("Nenhum provedor de email ativo no banco.");
-  }
-
-  const { data: distribution, error: distError } = await supabaseAdmin.rpc('get_provider_distribution');
-  
-  const countMap = new Map<string, number>();
-  if (!distError && distribution) {
-    distribution.forEach((item: any) => countMap.set(item.provider, Number(item.count)));
-  }
+  let totalContacts = 0;
+  countMap.forEach(c => totalContacts += c);
 
   const results: EmailProvider[] = [];
-  
-  // Simula a adição ao banco localmente para balancear o lote perfeitamente
   for (let i = 0; i < count; i++) {
-    const candidates = activeProviders.map((config) => {
-      const currentCount = countMap.get(config.provider) ?? 0;
-      const ratio = currentCount / Math.max(config.weight, 1);
-      return {
-        provider: config.provider as EmailProvider,
-        ratio: ratio,
-      };
-    });
-
-    candidates.sort((a, b) => a.ratio - b.ratio);
-    const winner = candidates[0].provider;
-    results.push(winner);
-    
-    // Atualiza o contador local para que o próximo laço veja a mudança
-    countMap.set(winner, (countMap.get(winner) ?? 0) + 1);
+    const index = (totalContacts + i) % orderedProviders.length;
+    results.push(orderedProviders[index]);
   }
 
+  console.log(`[ProviderSelector] Lote de ${count} contatos distribuído:`, results);
   return results;
 }
 
@@ -143,12 +136,11 @@ export async function canProviderSendToday(provider: EmailProvider): Promise<boo
  * Incremento ATÔMICO via RPC (Evita Race Conditions).
  */
 export async function incrementProviderSendCount(provider: EmailProvider): Promise<void> {
-  // Chama o SQL RPC para garantir que o incremento aconteça no banco
   const { error } = await supabaseAdmin.rpc('increment_provider_count', { 
     provider_name: provider 
   });
 
-  // Fallback caso o RPC não exista (para manter compatibilidade imediata)
+  // Fallback caso o RPC não exista
   if (error) {
     console.warn("RPC increment_provider_count não encontrado, usando fallback não-atômico.");
     const { data: config } = await supabaseAdmin

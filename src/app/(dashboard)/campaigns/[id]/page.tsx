@@ -16,68 +16,87 @@ interface CampaignDetailPageProps {
 
 /**
  * Calcula métricas de envio/entrega/abertura por etapa da campanha.
+ * Usa diretamente o campo stepStatus do CampaignContact (não depende de webhooks/EmailEvent).
  */
 async function getStepMetrics(campaignId: string, steps: any[], totalContacts: number) {
   if (totalContacts === 0 || steps.length === 0) return [];
 
-// Buscar todos os CampaignContacts com seus status e etapa atual
+  // Buscar todos os CampaignContacts com seus status e etapa atual
   const { data: contacts } = await supabaseAdmin
     .from('CampaignContact')
     .select('contactId, currentStepId, stepStatus, abVariant')
     .eq('campaignId', campaignId);
 
-  const contactIds = contacts?.map(c => c.contactId) || [];
-  
-  let events: any[] = [];
-  if (contactIds.length > 0) {
-    const { data } = await supabaseAdmin
-      .from('EmailEvent')
-      .select('contactId, eventType')
-      .in('contactId', contactIds);
-    events = data || [];
+  if (!contacts || contacts.length === 0) {
+    return steps.map((step: any) => ({
+      stepId: step.id,
+      stepOrder: step.stepOrder,
+      subject: step.subject,
+      subjectB: step.subjectB,
+      isABTest: step.isABTest,
+      delayHours: step.delayHours,
+      total: totalContacts,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      variantA: { sent: 0, delivered: 0, opened: 0, total: 0 },
+      variantB: { sent: 0, delivered: 0, opened: 0, total: 0 },
+    }));
   }
 
-  const eventsByContact = new Map();
-  events.forEach(e => {
-    if (!eventsByContact.has(e.contactId)) eventsByContact.set(e.contactId, []);
-    eventsByContact.get(e.contactId).push(e.eventType);
-  });
+  // Hierarquia de status: um contato com status DELIVERED também passou por SENT
+  const statusHierarchy: Record<string, number> = {
+    'QUEUED': 0,
+    'SENDING': 1,
+    'SENT': 2,
+    'DELIVERED': 3,
+    'OPENED': 4,
+    'CLICKED': 5,
+    'BOUNCED': -1,
+    'FAILED': -1,
+  };
 
-  // Calcular métricas por etapa
-  return steps.map((step: any) => {
-    const isFirstStep = step.stepOrder === 1;
-    const contactsInStep = contacts?.filter(c => c.currentStepId === step.id) || [];
-    
+  const isSent = (status: string) => (statusHierarchy[status] ?? 0) >= 2;
+  const isDelivered = (status: string) => (statusHierarchy[status] ?? 0) >= 3;
+  const isOpened = (status: string) => (statusHierarchy[status] ?? 0) >= 4;
+
+  // Ordenar etapas por stepOrder para determinar a progressão
+  const sortedSteps = [...steps].sort((a: any, b: any) => a.stepOrder - b.stepOrder);
+
+  return sortedSteps.map((step: any) => {
     let variantA = { sent: 0, delivered: 0, opened: 0, total: 0 };
     let variantB = { sent: 0, delivered: 0, opened: 0, total: 0 };
 
-    if (isFirstStep) {
-      contacts?.forEach(c => {
-        const evts = eventsByContact.get(c.contactId) || [];
-        const isB = c.abVariant === 'B';
-        const target = isB ? variantB : variantA;
-        
-        target.total += 1;
-        const hasSentEvent = evts.includes('SENT') || evts.includes('DELIVERED');
-        const hasDeliveredEvent = evts.includes('DELIVERED');
-        const hasOpenedEvent = evts.includes('OPENED') || evts.includes('CLICKED');
+    // Para cada etapa, analisamos os contatos que estão NAQUELA etapa ou já passaram por ela
+    // Na etapa 1, todos os contatos participam
+    // Nas etapas seguintes, apenas os que alcançaram aquela etapa
+    const isFirstStep = step.stepOrder === 1;
 
-        // Se o status no contato for SENT, DELIVERED ou OPENED, contamos como enviado
-        if (hasSentEvent || ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)) target.sent += 1;
-        if (hasDeliveredEvent || ['DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)) target.delivered += 1;
-        if (hasOpenedEvent || ['OPENED', 'CLICKED'].includes(c.stepStatus)) target.opened += 1;
-      });
-    } else {
-      contactsInStep.forEach(c => {
-        const isB = c.abVariant === 'B';
-        const target = isB ? variantB : variantA;
-        
-        target.total += 1;
+    contacts.forEach(c => {
+      // Encontrar a stepOrder da etapa atual do contato
+      const contactCurrentStep = sortedSteps.find((s: any) => s.id === c.currentStepId);
+      const contactStepOrder = contactCurrentStep?.stepOrder ?? 1;
+
+      // O contato participa dessa etapa se: está nela OU já passou por ela
+      const participates = isFirstStep || contactStepOrder >= step.stepOrder;
+      if (!participates) return;
+
+      const isB = c.abVariant === 'B';
+      const target = isB ? variantB : variantA;
+      target.total += 1;
+
+      // Se o contato está em uma etapa POSTERIOR, ele já completou esta etapa
+      if (contactStepOrder > step.stepOrder) {
         target.sent += 1;
-        target.delivered += 1; // estimate
-        if (['OPENED', 'CLICKED'].includes(c.stepStatus)) target.opened += 1;
-      });
-    }
+        target.delivered += 1;
+        target.opened += 1; // Se avançou, é porque abriu
+      } else if (contactStepOrder === step.stepOrder) {
+        // Está nesta etapa - usar o stepStatus atual
+        if (isSent(c.stepStatus)) target.sent += 1;
+        if (isDelivered(c.stepStatus)) target.delivered += 1;
+        if (isOpened(c.stepStatus)) target.opened += 1;
+      }
+    });
 
     return {
       stepId: step.id,
@@ -91,7 +110,7 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       delivered: variantA.delivered + variantB.delivered,
       opened: variantA.opened + variantB.opened,
       variantA,
-      variantB
+      variantB,
     };
   });
 }
