@@ -60,20 +60,39 @@ export function ProviderList({ providers }: { providers: any[] }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {providers.map((p) => (
+        {providers.map((p) => {
+          const tierColors: Record<string, string> = {
+            NOVA: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+            AQUECIDA: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+            VETERANA: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+          };
+          const tierLabels: Record<string, string> = {
+            NOVA: '🌱 Nova',
+            AQUECIDA: '🔥 Aquecida',
+            VETERANA: '⭐ Veterana',
+          };
+          const tier = p.accountTier || 'NOVA';
+          const bounceRate = p.totalSent > 0 ? ((p.totalBounces || 0) / p.totalSent * 100).toFixed(1) : '0.0';
+
+          return (
           <div key={p.id} className="glass-panel p-6 rounded-2xl flex flex-col relative overflow-hidden group">
             <div className={`absolute top-0 left-0 w-full h-1 ${p.isActive ? 'bg-primary-500' : 'bg-surface-600'}`} />
             
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-xl \${p.isActive ? 'bg-primary-500/20 text-primary-400' : 'bg-surface-800 text-surface-500'}`}>
+                <div className={`p-3 rounded-xl ${p.isActive ? 'bg-primary-500/20 text-primary-400' : 'bg-surface-800 text-surface-500'}`}>
                   <Server className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-surface-50">{p.provider}</h3>
-                  <span className="text-xs text-surface-400 px-2 py-1 rounded bg-surface-800">
-                    {p.providerType === 'SMTP' ? 'SMTP Customizado' : 'API Brevo'}
-                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-surface-400 px-2 py-0.5 rounded bg-surface-800">
+                      {p.providerType === 'SMTP' ? 'SMTP' : 'API Brevo'}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded border ${tierColors[tier] || tierColors.NOVA}`}>
+                      {tierLabels[tier] || tierLabels.NOVA}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -92,11 +111,21 @@ export function ProviderList({ providers }: { providers: any[] }) {
             <div className="space-y-3 flex-1">
               <div className="flex justify-between text-sm">
                 <span className="text-surface-400">Remetente:</span>
-                <span className="text-surface-100 font-medium">{p.fromEmail}</span>
+                <span className="text-surface-100 font-medium truncate ml-2">{p.fromEmail}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-surface-400">Limite Diário:</span>
+                <span className="text-surface-400">Envios Hoje:</span>
                 <span className="text-surface-100 font-medium">{p.sentToday} / {p.dailyLimit}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-surface-400">Total Enviados:</span>
+                <span className="text-surface-100 font-medium">{p.totalSent || 0}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-surface-400">Reputação:</span>
+                <span className={`font-medium ${Number(bounceRate) > 5 ? 'text-red-400' : Number(bounceRate) > 2 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {bounceRate}% bounce{(p.totalComplaints || 0) > 0 && ` · ${p.totalComplaints} complaints`}
+                </span>
               </div>
               {p.providerType === 'SMTP' && (
                 <div className="flex justify-between text-sm">
@@ -115,10 +144,11 @@ export function ProviderList({ providers }: { providers: any[] }) {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {providers.length === 0 && (
           <div className="col-span-full py-12 text-center text-surface-400 glass-panel rounded-2xl">
-            Nenhum provedor configurado. Clique em "Novo Provedor" para começar.
+            Nenhum provedor configurado. Clique em &quot;Novo Provedor&quot; para começar.
           </div>
         )}
       </div>
@@ -180,10 +210,30 @@ export function ProviderList({ providers }: { providers: any[] }) {
                 <div>
                   <label className="block text-sm font-medium text-surface-300 mb-2">Limite Diário de Envios</label>
                   <input name="dailyLimit" type="number" min="1" required defaultValue={editingProvider?.dailyLimit || 500} className="w-full bg-surface-950 border border-surface-800 rounded-xl px-4 py-3 text-surface-50 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all outline-none" />
+                  <p className="text-xs text-surface-500 mt-1">Limite máximo. O sistema de warmup aplica limites menores para contas novas.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-surface-300 mb-2">Peso (Prioridade na fila)</label>
                   <input name="weight" type="number" min="1" required defaultValue={editingProvider?.weight || 25} className="w-full bg-surface-950 border border-surface-800 rounded-xl px-4 py-3 text-surface-50 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-surface-300 mb-2">Classificação da Conta</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { value: "NOVA", label: "🌱 Nova", desc: "Conta recém-criada — warmup ativo", color: "border-amber-500/50 bg-amber-500/10" },
+                    { value: "AQUECIDA", label: "🔥 Aquecida", desc: "Conta com 2+ semanas de uso", color: "border-blue-500/50 bg-blue-500/10" },
+                    { value: "VETERANA", label: "⭐ Veterana", desc: "Conta estabelecida — sem limites de warmup", color: "border-emerald-500/50 bg-emerald-500/10" },
+                  ].map(tier => (
+                    <label key={tier.value} className={`flex flex-col items-center p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                      (editingProvider?.accountTier || "NOVA") === tier.value ? tier.color : 'border-surface-800 bg-surface-950'
+                    }`}>
+                      <input type="radio" name="accountTier" value={tier.value} defaultChecked={(editingProvider?.accountTier || "NOVA") === tier.value} className="sr-only" />
+                      <span className="text-sm font-bold text-surface-50">{tier.label}</span>
+                      <span className="text-[10px] text-surface-400 text-center mt-1">{tier.desc}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 

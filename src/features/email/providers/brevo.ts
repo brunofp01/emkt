@@ -1,9 +1,14 @@
 /**
- * Adaptador para o provedor Brevo (ex-Sendinblue).
+ * Adaptador para o provedor Brevo (ex-Sendinblue) — Versão Deliverability.
  * Usa fetch direto na API v3 (SDK oficial tem tipagem inconsistente).
  * Docs: https://developers.brevo.com/docs
+ * 
+ * Inclui headers de conformidade:
+ *   - List-Unsubscribe via headers da API
+ *   - Auto-geração de text/plain
  */
 import type { EmailProviderAdapter, SendEmailParams, SendEmailResult } from "@/shared/types";
+import { htmlToText } from "@/features/email/lib/html-to-text";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
@@ -12,6 +17,16 @@ export const brevoProvider: EmailProviderAdapter = {
 
   async send(params: SendEmailParams): Promise<SendEmailResult> {
     try {
+      // Gerar text/plain automaticamente se não fornecido
+      const textContent = params.text || htmlToText(params.html);
+
+      // Montar headers de conformidade
+      const headers: Record<string, string> = {};
+      if (params.unsubscribeUrl) {
+        headers["List-Unsubscribe"] = `<${params.unsubscribeUrl}>`;
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+      }
+
       const response = await fetch(BREVO_API_URL, {
         method: "POST",
         headers: {
@@ -24,9 +39,10 @@ export const brevoProvider: EmailProviderAdapter = {
           to: [{ email: params.to }],
           subject: params.subject,
           htmlContent: params.html,
-          textContent: params.text,
-          replyTo: params.replyTo ? { email: params.replyTo } : undefined,
+          textContent: textContent,
+          replyTo: params.replyTo ? { email: params.replyTo } : { email: params.from },
           tags: params.tags ? Object.keys(params.tags) : undefined,
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
         }),
       });
 

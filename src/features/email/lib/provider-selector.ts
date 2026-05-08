@@ -1,9 +1,16 @@
 /**
- * Provider Selector — Balanceador Dinâmico (Fase 8)
+ * Provider Selector — Balanceador Dinâmico com Score de Reputação
+ * 
  * O sistema busca os provedores ativos no banco de dados e distribui contatos
- * de forma circular entre eles. Suporta contas infinitas (ex: múltiplos Gmails).
+ * de forma inteligente, priorizando contas com melhor reputação.
+ * 
+ * Melhorias de deliverability:
+ *   - Rotação ponderada por score de reputação (menos bounces = mais prioridade)
+ *   - Integração com warmup engine para limites diários efetivos
+ *   - Reset automático com tracking de tier
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
+import { getEffectiveDailyLimit, type AccountTier } from "@/features/email/lib/warmup-engine";
 
 /**
  * Busca a lista de IDs dos provedores ativos no banco.
@@ -48,21 +55,89 @@ async function getProviderCounts(providers: string[]): Promise<Map<string, numbe
 }
 
 /**
- * Seleciona o próximo provedor da fila ordenada.
- * Conta quantos contatos existem no total e pega o próximo da fila.
+ * Calcula o score de reputação de um provedor (0-100).
+ * Score mais alto = conta mais saudável = deve receber mais contatos.
+ */
+function calculateReputationScore(config: {
+  totalSent: number;
+  totalBounces: number;
+  totalComplaints: number;
+  accountTier: string;
+}): number {
+  let score = 100;
+
+  // Penalizar por bounces (até -40 pontos)
+  if (config.totalSent > 0) {
+    const bounceRate = (config.totalBounces / config.totalSent) * 100;
+    score -= Math.min(bounceRate * 4, 40);
+  }
+
+  // Penalizar por complaints (cada um vale -15 pontos)
+  score -= config.totalComplaints * 15;
+
+  // Bônus por tier: contas veteranas têm vantagem
+  if (config.accountTier === "VETERANA") score += 10;
+  if (config.accountTier === "AQUECIDA") score += 5;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Seleciona o próximo provedor usando rotação ponderada por reputação.
+ * Contas com melhor score recebem mais contatos.
  */
 export async function selectProviderForNewContact(): Promise<string> {
-  const orderedProviders = await getActiveOrderedProviders();
-  const countMap = await getProviderCounts(orderedProviders);
+  const { data: configs, error } = await supabaseAdmin
+    .from('ProviderConfig')
+    .select('provider, totalSent, totalBounces, totalComplaints, accountTier, weight')
+    .eq('isActive', true)
+    .order('createdAt', { ascending: true });
 
-  let totalContacts = 0;
-  countMap.forEach(count => totalContacts += count);
+  if (error) throw error;
+  if (!configs || configs.length === 0) {
+    throw new Error("Nenhum provedor de email ativo.");
+  }
 
-  const nextIndex = totalContacts % orderedProviders.length;
-  const selected = orderedProviders[nextIndex];
+  // Para uma única conta, retornar direto
+  if (configs.length === 1) return configs[0].provider;
 
-  console.log(`[ProviderSelector] Total contatos: ${totalContacts}, Próximo: ${nextIndex}, Selecionado: ${selected}`);
-  return selected;
+  // Calcular peso ponderado (weight configurado × score de reputação)
+  const weighted = configs.map(c => ({
+    provider: c.provider,
+    score: calculateReputationScore(c),
+    weight: c.weight || 25,
+    effectiveWeight: 0,
+  }));
+
+  // Peso efetivo = weight × (score/100)
+  weighted.forEach(w => {
+    w.effectiveWeight = w.weight * (w.score / 100);
+  });
+
+  const totalWeight = weighted.reduce((sum, w) => sum + w.effectiveWeight, 0);
+
+  if (totalWeight === 0) {
+    // Fallback: round-robin simples se todos os scores são 0
+    const countMap = await getProviderCounts(configs.map(c => c.provider));
+    let totalContacts = 0;
+    countMap.forEach(count => totalContacts += count);
+    const nextIndex = totalContacts % configs.length;
+    return configs[nextIndex].provider;
+  }
+
+  // Seleção aleatória ponderada
+  const random = Math.random() * totalWeight;
+  let cumulative = 0;
+  for (const w of weighted) {
+    cumulative += w.effectiveWeight;
+    if (random <= cumulative) {
+      console.log(`[ProviderSelector] Selecionado: ${w.provider} (score: ${w.score}, weight: ${w.effectiveWeight.toFixed(1)})`);
+      return w.provider;
+    }
+  }
+
+  // Fallback improvável
+  return weighted[weighted.length - 1].provider;
 }
 
 /**
@@ -86,7 +161,7 @@ export async function assignProvidersToContacts(count: number): Promise<string[]
 }
 
 /**
- * Verifica limites diários com reset automático.
+ * Verifica limites diários com reset automático e suporte a warmup.
  */
 export async function canProviderSendToday(provider: string): Promise<boolean> {
   const { data: config, error } = await supabaseAdmin
@@ -105,12 +180,19 @@ export async function canProviderSendToday(provider: string): Promise<boolean> {
   if (isNewDay) {
     await supabaseAdmin
       .from('ProviderConfig')
-      .update({ sentToday: 0, lastResetAt: now.toISOString() })
+      .update({ sentToday: 0, lastResetAt: now.toISOString(), updatedAt: now.toISOString() })
       .eq('provider', provider);
     return true;
   }
 
-  return config.sentToday < config.dailyLimit;
+  // Usar limite efetivo do warmup
+  const effectiveLimit = getEffectiveDailyLimit(
+    config.dailyLimit,
+    (config.accountTier || 'NOVA') as AccountTier,
+    new Date(config.warmupStartedAt || config.createdAt)
+  );
+
+  return config.sentToday < effectiveLimit;
 }
 
 /**
@@ -131,7 +213,7 @@ export async function incrementProviderSendCount(provider: string): Promise<void
     if (config) {
       await supabaseAdmin
         .from('ProviderConfig')
-        .update({ sentToday: config.sentToday + 1 })
+        .update({ sentToday: config.sentToday + 1, updatedAt: new Date().toISOString() })
         .eq('provider', provider);
     }
   }

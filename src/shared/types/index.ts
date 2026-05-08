@@ -23,6 +23,10 @@ export interface SendEmailParams {
   text?: string;
   replyTo?: string;
   tags?: Record<string, string>;
+  /** URL de descadastro (List-Unsubscribe) — obrigatório para conformidade RFC 8058 */
+  unsubscribeUrl?: string;
+  /** ID do contato para gerar Message-ID único */
+  contactId?: string;
 }
 
 /** Interface que todo provedor de email deve implementar */
