@@ -41,12 +41,12 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-dvh flex flex-col border-r border-surface-800/60 bg-surface-950/95 backdrop-blur-xl transition-all duration-300",
+        "fixed inset-y-0 left-0 z-[60] flex flex-col border-r border-surface-800/60 bg-surface-950/98 backdrop-blur-2xl transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none",
         // Mobile behavior: Slide in/out
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         // Desktop behavior: Collapse/Expand
         collapsed ? "lg:w-[72px]" : "lg:w-[260px]",
-        "w-[260px]" // Default width for mobile and expanded desktop
+        "w-[280px] lg:w-[260px]" // Default width for mobile and expanded desktop
       )}
     >
       {/* Logo & Close (Mobile) */}

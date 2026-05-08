@@ -53,7 +53,7 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
           </button>
         </div>
 
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           {state.error && (
             <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
@@ -68,10 +68,10 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
             </div>
           )}
 
-          <form action={formAction} className="space-y-5">
+          <form action={formAction} className="space-y-6">
             {isEditing && <input type="hidden" name="id" value={initialData.id} />}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div className="sm:col-span-2">
                 <label htmlFor="contact-email" className={labelClass}>Email Principal *</label>
                 <div className="relative group">
                    <Mail className={iconClass} />
@@ -95,7 +95,7 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
                   <input id="contact-name" name="name" type="text" placeholder="ex: João Silva" className={inputClass} defaultValue={initialData?.name ?? ""} />
                 </div>
               </div>
- 
+
               <div>
                 <label htmlFor="contact-phone" className={labelClass}>Telefone / WhatsApp</label>
                 <div className="relative group">
@@ -103,7 +103,7 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
                   <input id="contact-phone" name="phone" type="tel" placeholder="ex: (11) 99999-9999" className={inputClass} defaultValue={initialData?.phone ?? ""} />
                 </div>
               </div>
- 
+
               <div>
                 <label htmlFor="contact-company" className={labelClass}>Empresa</label>
                 <div className="relative group">
@@ -111,17 +111,17 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
                   <input id="contact-company" name="company" type="text" placeholder="ex: Tech Solutions" className={inputClass} defaultValue={initialData?.company ?? ""} />
                 </div>
               </div>
- 
+
               <div>
-                <label htmlFor="contact-tags" className={labelClass}>Tags (separadas por vírgula)</label>
+                <label htmlFor="contact-tags" className={labelClass}>Tags</label>
                 <div className="relative group">
                   <Tag className={iconClass} />
-                  <input id="contact-tags" name="tags" type="text" placeholder="ex: lead, vip, 2024" className={inputClass} defaultValue={initialData?.tags?.join(", ")} />
+                  <input id="contact-tags" name="tags" type="text" placeholder="lead, vip, 2024" className={inputClass} defaultValue={initialData?.tags?.join(", ")} />
                 </div>
               </div>
 
               {/* Seletor de Provedor */}
-              <div>
+              <div className="sm:col-span-2">
                 <label htmlFor="contact-provider" className={labelClass}>Provedor de Email</label>
                 <div className="relative group">
                   <Server className={iconClass} />
@@ -135,7 +135,7 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
               </div>
 
               {!isEditing && (
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2">
                   <label htmlFor="contact-campaign" className={labelClass}>Adicionar à Campanha</label>
                   <div className="relative group">
                     <Activity className={iconClass} />
@@ -146,18 +146,15 @@ export function ContactForm({ onClose, campaigns, activeProviders = [], initialD
                       ))}
                     </select>
                   </div>
-                  <p className="mt-1.5 text-[10px] text-surface-500 italic ml-1">
-                    Se selecionado, o contato iniciará o fluxo de emails automaticamente.
-                  </p>
                 </div>
               )}
             </div>
 
-            <div className="pt-4">
+            <div className="pt-2">
               <button 
                 type="submit" 
                 disabled={isPending} 
-                className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-primary-600 font-bold text-white shadow-xl shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] disabled:opacity-50 transition-all"
+                className="flex h-12 sm:h-13 w-full items-center justify-center gap-3 rounded-2xl bg-primary-600 font-bold text-white shadow-xl shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] disabled:opacity-50 transition-all text-base sm:text-sm"
               >
                 {isPending ? (
                   <><Loader2 className="h-5 w-5 animate-spin" /> Processando...</>

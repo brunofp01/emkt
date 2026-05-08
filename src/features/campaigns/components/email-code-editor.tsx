@@ -61,9 +61,9 @@ export function EmailCodeEditor({ initialHtml, subject, onSave, onCancel }: Emai
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Viewport Selectors */}
-          <div className="hidden md:flex items-center bg-surface-950 rounded-lg p-1 border border-surface-800">
+          <div className="hidden sm:flex items-center bg-surface-950 rounded-lg p-1 border border-surface-800">
             {(["desktop", "tablet", "mobile"] as const).map((mode) => (
               <button
                 key={mode}
@@ -77,66 +77,68 @@ export function EmailCodeEditor({ initialHtml, subject, onSave, onCancel }: Emai
             ))}
           </div>
 
-          <div className="h-6 w-px bg-surface-800 mx-2" />
+          <div className="hidden sm:block h-6 w-px bg-surface-800 mx-1" />
 
           <button onClick={onCancel} className="p-2 text-surface-500 hover:text-surface-300 transition-colors">
             <X className="h-5 w-5" />
           </button>
           <button 
             onClick={() => onSave(html)}
-            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary-600/20 active:scale-95"
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg shadow-primary-600/20 active:scale-95 whitespace-nowrap"
           >
-            <Save className="h-4 w-4" /> Salvar Design
+            <Save className="h-4 w-4 sm:h-5 sm:w-5" /> 
+            <span className="hidden xs:inline">Salvar Design</span>
+            <span className="xs:hidden">Salvar</span>
           </button>
         </div>
       </div>
 
       {/* Workspace: Editor + Preview */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Editor (Lado Esquerdo) */}
-        <div className="w-1/2 flex flex-col border-r border-surface-800 bg-surface-950">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Editor (Lado Esquerdo / Topo no Mobile) */}
+        <div className="h-1/2 lg:h-auto lg:w-1/2 flex flex-col border-b lg:border-b-0 lg:border-r border-surface-800 bg-surface-950">
           <div className="px-4 py-2 bg-surface-900/30 flex items-center justify-between border-b border-surface-800">
             <span className="text-[10px] font-bold text-surface-500 uppercase">index.html</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-primary-400/70">Variáveis: {"{{contactName}}"}, {"{{contactCompany}}"}</span>
+              <span className="text-[9px] sm:text-[10px] text-primary-400/70">Variáveis: {"{{name}}"}, {"{{company}}"}</span>
             </div>
           </div>
           <textarea
             value={html}
             onChange={(e) => setHtml(e.target.value)}
-            className="flex-1 w-full p-6 bg-surface-950 text-surface-300 font-mono text-sm resize-none focus:outline-none focus:ring-0"
+            className="flex-1 w-full p-4 sm:p-6 bg-surface-950 text-surface-300 font-mono text-sm resize-none focus:outline-none focus:ring-0"
             spellCheck={false}
           />
         </div>
 
-        {/* Preview (Lado Direito) */}
-        <div className="w-1/2 flex flex-col bg-surface-900/20">
-          <div className="px-6 py-4 border-b border-surface-800 bg-surface-950/50">
-            <div className="space-y-1.5">
+        {/* Preview (Lado Direito / Baixo no Mobile) */}
+        <div className="h-1/2 lg:h-auto lg:w-1/2 flex flex-col bg-surface-900/20 overflow-hidden">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-surface-800 bg-surface-950/50 shrink-0">
+            <div className="space-y-1 sm:space-y-1.5">
               <div className="flex gap-2">
-                <span className="text-[10px] font-bold text-surface-500 w-12">DE:</span>
-                <span className="text-[10px] text-surface-300">Equipe de Vendas &lt;vendas@mailpulse.com&gt;</span>
+                <span className="text-[9px] font-bold text-surface-500 w-10">DE:</span>
+                <span className="text-[9px] text-surface-400 truncate">Vendas &lt;vendas@mailpulse.com&gt;</span>
               </div>
               <div className="flex gap-2">
-                <span className="text-[10px] font-bold text-surface-500 w-12">PARA:</span>
-                <span className="text-[10px] text-surface-300">{mockData.contactName} &lt;{mockData.contactEmail}&gt;</span>
+                <span className="text-[9px] font-bold text-surface-500 w-10">PARA:</span>
+                <span className="text-[9px] text-surface-400 truncate">{mockData.contactName} &lt;{mockData.contactEmail}&gt;</span>
               </div>
               <div className="flex gap-2">
-                <span className="text-[10px] font-bold text-surface-500 w-12">ASSUNTO:</span>
-                <span className="text-xs font-bold text-primary-400">{subject || "(Sem Assunto)"}</span>
+                <span className="text-[9px] font-bold text-surface-500 w-10">ASSUNTO:</span>
+                <span className="text-[10px] font-bold text-primary-400 truncate">{subject || "(Sem Assunto)"}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 p-8 flex justify-center overflow-auto bg-surface-800/30">
+          <div className="flex-1 p-4 sm:p-8 flex justify-center overflow-auto bg-surface-800/30 custom-scrollbar">
             <div 
-              className="bg-white shadow-2xl transition-all duration-300 h-full overflow-hidden rounded-md"
-              style={{ width: viewWidths[viewMode] }}
+              className="bg-white shadow-2xl transition-all duration-300 h-fit min-h-full overflow-hidden rounded-md shrink-0"
+              style={{ width: viewMode === 'desktop' ? '100%' : viewWidths[viewMode] }}
             >
               <iframe
                 ref={iframeRef}
                 title="Email Preview"
-                className="w-full h-full border-none"
+                className="w-full h-full border-none min-h-[500px]"
               />
             </div>
           </div>

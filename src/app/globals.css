@@ -207,14 +207,19 @@ body {
    Layout helpers
    ============================================ */
 
+/* ============================================
+   Layout helpers
+   ============================================ */
+
 .dashboard-grid {
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
   grid-template-columns: 1fr;
 }
 
 @media (min-width: 640px) {
   .dashboard-grid {
+    gap: 1.5rem;
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -222,5 +227,34 @@ body {
 @media (min-width: 1024px) {
   .dashboard-grid {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Responsividade de padding para cards */
+.glass-card {
+  padding: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .glass-card {
+    padding: 1.5rem;
+  }
+}
+
+/* Helper para tabelas mobile */
+.mobile-table-wrapper {
+  @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Esconder elementos no celular de forma elegante */
+.hide-on-mobile {
+  @apply hidden sm:block;
+}
+
+/* Estilo para inputs no mobile - foco maior */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px !important; /* Evita zoom automático no iOS */
   }
 }

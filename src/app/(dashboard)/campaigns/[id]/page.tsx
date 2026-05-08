@@ -148,46 +148,48 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> Criada em {formatDate(campaign.createdAt)}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <StatusBadge 
               status={campaign.status || "DRAFT"} 
               label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] || campaign.status} 
               size="md" 
               dot 
             />
-            {campaign.status === "DRAFT" && (
-              <form action={async () => {
-                "use server";
-                await activateCampaign(campaign.id);
-              }}>
-                <button type="submit" className="flex items-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-medium text-white shadow-lg shadow-success/20 hover:bg-success/90 active:scale-[0.97]">
-                  <Play className="h-4 w-4" /> Ativar Campanha
-                </button>
-              </form>
-            )}
-            {campaign.status === "ACTIVE" && (
-              <form action={async () => {
-                "use server";
-                await pauseCampaign(campaign.id);
-              }}>
-                <button type="submit" className="flex items-center gap-2 rounded-lg bg-warning px-4 py-2 text-sm font-medium text-white shadow-lg shadow-warning/20 hover:bg-warning/90 active:scale-[0.97]">
-                  <Pause className="h-4 w-4" /> Pausar
-                </button>
-              </form>
-            )}
-            {campaign.status === "PAUSED" && (
-              <form action={async () => {
-                "use server";
-                await activateCampaign(campaign.id);
-              }}>
-                <button type="submit" className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.97]">
-                  <RotateCcw className="h-4 w-4" /> Retomar
-                </button>
-              </form>
-            )}
-            <Link href={`/campaigns/${campaign.id}/analytics`} className="flex items-center gap-2 rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-medium text-surface-200 hover:bg-surface-700 active:scale-[0.97]">
-              <BarChart3 className="h-4 w-4" /> Ver Analytics
-            </Link>
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {campaign.status === "DRAFT" && (
+                <form action={async () => {
+                  "use server";
+                  await activateCampaign(campaign.id);
+                }} className="flex-1 sm:flex-none">
+                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-bold text-white shadow-lg shadow-success/20 hover:bg-success/90 active:scale-[0.97] transition-all">
+                    <Play className="h-4 w-4" /> <span className="whitespace-nowrap">Ativar Campanha</span>
+                  </button>
+                </form>
+              )}
+              {campaign.status === "ACTIVE" && (
+                <form action={async () => {
+                  "use server";
+                  await pauseCampaign(campaign.id);
+                }} className="flex-1 sm:flex-none">
+                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-warning px-4 py-2 text-sm font-bold text-white shadow-lg shadow-warning/20 hover:bg-warning/90 active:scale-[0.97] transition-all">
+                    <Pause className="h-4 w-4" /> Pausar
+                  </button>
+                </form>
+              )}
+              {campaign.status === "PAUSED" && (
+                <form action={async () => {
+                  "use server";
+                  await activateCampaign(campaign.id);
+                }} className="flex-1 sm:flex-none">
+                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.97] transition-all">
+                    <RotateCcw className="h-4 w-4" /> Retomar
+                  </button>
+                </form>
+              )}
+              <Link href={`/campaigns/${campaign.id}/analytics`} className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-bold text-surface-200 hover:bg-surface-700 active:scale-[0.97] transition-all">
+                <BarChart3 className="h-4 w-4" /> <span className="whitespace-nowrap">Analytics</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -392,31 +394,31 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           const estimatedMinutes = Math.ceil(queued * 1.5); // ~90s por email na média
 
           return (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
               <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Na Fila</p>
-                <p className="text-2xl font-black text-amber-400 mt-1">{queued}</p>
+                <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{queued}</p>
                 {queued > 0 && (
-                  <p className="text-[10px] text-surface-500 mt-1">
-                    ≈ {estimatedMinutes < 60 ? `${estimatedMinutes} min` : `${Math.ceil(estimatedMinutes / 60)}h`} restantes
+                  <p className="text-[9px] text-surface-500 mt-0.5">
+                    ≈ {estimatedMinutes < 60 ? `${estimatedMinutes} min` : `${Math.ceil(estimatedMinutes / 60)}h`}
                   </p>
                 )}
               </div>
               <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Enviando</p>
-                <p className="text-2xl font-black text-blue-400 mt-1">{sending}</p>
+                <p className="text-xl sm:text-2xl font-black text-blue-400 mt-1">{sending}</p>
               </div>
               <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Enviados</p>
-                <p className="text-2xl font-black text-emerald-400 mt-1">{sent}</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">{sent}</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Falha</p>
-                <p className="text-2xl font-black text-red-400 mt-1">{failed}</p>
+                <p className="text-xl sm:text-2xl font-black text-red-400 mt-1">{failed}</p>
               </div>
-              <div className="p-3 rounded-xl bg-surface-800/50 border border-surface-800">
+              <div className="p-3 rounded-xl bg-surface-800/50 border border-surface-800 col-span-2 lg:col-span-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-surface-400">Total</p>
-                <p className="text-2xl font-black text-surface-200 mt-1">{contacts.length}</p>
+                <p className="text-xl sm:text-2xl font-black text-surface-200 mt-1">{contacts.length}</p>
               </div>
             </div>
           );
@@ -436,7 +438,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </div>
         )}
         
-        <div className="overflow-x-auto">
+        <div className="mobile-table-wrapper">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-surface-800 text-[10px] font-bold uppercase tracking-widest text-surface-500">

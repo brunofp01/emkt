@@ -10,12 +10,12 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-surface-50">Analytics Global</h1>
-          <p className="mt-1 text-sm text-surface-500">Inteligência consolidada e análise de performance profunda.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-surface-50 tracking-tight">Analytics Global</h1>
+          <p className="mt-1 text-xs sm:text-sm text-surface-500">Inteligência consolidada e análise de performance profunda.</p>
         </div>
-        <div className="p-2 rounded-lg bg-surface-900 border border-surface-800">
+        <div className="hidden sm:flex p-2 rounded-lg bg-surface-900 border border-surface-800">
           <PieChart className="h-6 w-6 text-primary-500" />
         </div>
       </div>

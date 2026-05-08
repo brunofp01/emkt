@@ -69,33 +69,51 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns, act
 
   return (
     <>
-      {showForm && <ContactForm key={`form-${Date.now()}`} campaigns={campaigns} activeProviders={activeProviders} onClose={() => { setShowForm(false); window.location.reload(); }} />}
-      {showImport && <ImportModal key={`import-${Date.now()}`} campaigns={campaigns} onClose={() => { setShowImport(false); window.location.reload(); }} />}
+      {showForm && (
+        <ContactForm 
+          campaigns={campaigns} 
+          activeProviders={activeProviders} 
+          onClose={() => { 
+            setShowForm(false); 
+            router.refresh(); 
+          }} 
+        />
+      )}
+      {showImport && (
+        <ImportModal 
+          campaigns={campaigns} 
+          onClose={() => { 
+            setShowImport(false); 
+            router.refresh(); 
+          }} 
+        />
+      )}
 
       <div className="space-y-6">
         {/* Header de Ações Principais */}
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <div className="relative w-full lg:max-w-md">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-md order-2 lg:order-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-500" />
             <input 
               type="text"
-              placeholder="Buscar por email, nome ou empresa..."
+              placeholder="Buscar contatos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-surface-900/50 border border-surface-800 rounded-2xl text-sm text-surface-200 focus:outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/5 transition-all"
+              className="w-full pl-12 pr-4 py-3 bg-surface-900/50 border border-surface-800 rounded-2xl text-sm text-surface-200 focus:outline-none focus:border-primary-500/50 focus:ring-4 focus:ring-primary-500/5 transition-all shadow-inner"
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 w-full lg:w-auto order-1 lg:order-2">
             <button 
               onClick={() => setShowImport(true)}
-              className="flex-1 lg:flex-none flex items-center justify-center gap-2 rounded-xl bg-surface-800 px-5 py-3 text-sm font-bold text-surface-200 hover:bg-surface-700 active:scale-[0.98] transition-all"
+              className="flex-1 lg:flex-none flex items-center justify-center gap-2 rounded-xl bg-surface-800 px-4 py-3 text-sm font-bold text-surface-200 hover:bg-surface-700 active:scale-[0.98] transition-all border border-surface-700/50"
             >
-              <FileUp className="h-4 w-4 text-primary-500" /> Importar
+              <FileUp className="h-4 w-4 text-primary-500" /> 
+              <span className="hidden sm:inline">Importar</span>
             </button>
             <button 
               onClick={() => setShowForm(true)} 
-              className="flex-1 lg:flex-none flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] transition-all whitespace-nowrap"
+              className="flex-2 lg:flex-none flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.98] transition-all whitespace-nowrap"
             >
               <Plus className="h-4 w-4" /> Novo Contato
             </button>
@@ -131,8 +149,8 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns, act
           </div>
         </div>
 
-        <div className="glass-card overflow-hidden border border-surface-800/40">
-          <div className="overflow-x-auto">
+        <div className="glass-card overflow-hidden border border-surface-800/40 !p-0">
+          <div className="mobile-table-wrapper">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-800/60 text-left text-[10px] font-black uppercase tracking-[0.15em] text-surface-600 bg-surface-900/40">
