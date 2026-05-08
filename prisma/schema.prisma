@@ -124,27 +124,27 @@ model EmailEvent {
 /// Configuração dos provedores de email.
 /// Controla pesos de distribuição, limites, warmup e reputação de cada provedor.
 model ProviderConfig {
-  id              String        @id @default(cuid())
-  provider        String        @unique
-  providerType    String        @default("SMTP")
-  weight          Int           @default(25)
-  dailyLimit      Int           @default(100)
-  sentToday       Int           @default(0)
-  isActive        Boolean       @default(true)
+  id              String   @id @default(cuid())
+  provider        String   @unique
+  weight          Int      @default(25)
+  dailyLimit      Int      @default(100)
+  sentToday       Int      @default(0)
+  isActive        Boolean  @default(true)
   fromEmail       String
   fromName        String
+  lastResetAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  providerType    String   @default("SMTP")
   smtpHost        String?
-  smtpUser        String?
   smtpPass        String?
-  smtpPort        Int?          @default(587)
-  accountTier     String        @default("NOVA")
-  warmupStartedAt DateTime      @default(now())
-  totalBounces    Int           @default(0)
-  totalComplaints Int           @default(0)
-  totalSent       Int           @default(0)
-  lastResetAt     DateTime      @default(now())
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  smtpPort        Int?     @default(587)
+  smtpUser        String?
+  accountTier     String   @default("NOVA")
+  warmupStartedAt DateTime @default(now())
+  totalBounces    Int      @default(0)
+  totalComplaints Int      @default(0)
+  totalSent       Int      @default(0)
 
   @@index([accountTier])
   @@index([isActive, accountTier])

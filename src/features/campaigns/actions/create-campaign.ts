@@ -48,6 +48,8 @@ const campaignStepSchema = z.object({
 const createCampaignSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
   description: z.string().nullable().optional(),
+  audienceType: z.enum(["NONE", "ALL", "TAGS"]).default("NONE"),
+  audienceTags: z.array(z.string()).default([]),
   steps: z.array(campaignStepSchema).min(1, "Pelo menos uma etapa é necessária"),
 });
 
@@ -61,11 +63,21 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
     const stepsRaw = formData.get("steps") as string;
     const name = formData.get("name") as string;
     const description = (formData.get("description") as string) || null;
+    const audienceType = (formData.get("audienceType") as string) || "NONE";
+    const audienceTagsRaw = (formData.get("audienceTags") as string) || "[]";
 
     if (!stepsRaw) throw new Error("O campo 'steps' está ausente no FormData.");
 
     const parsedSteps = JSON.parse(stepsRaw);
-    const validated = createCampaignSchema.parse({ name, description, steps: parsedSteps });
+    const parsedTags = JSON.parse(audienceTagsRaw);
+    
+    const validated = createCampaignSchema.parse({ 
+      name, 
+      description, 
+      steps: parsedSteps,
+      audienceType,
+      audienceTags: parsedTags
+    });
 
     // 1. Criar a Campanha
     const campaignId = generateId();
@@ -103,6 +115,23 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
       .insert(stepsToInsert);
 
     if (stepsError) throw new Error(`Erro ao criar etapas: ${stepsError.message}`);
+
+    // 3. Adicionar Contatos (Público Alvo)
+    if (validated.audienceType !== "NONE") {
+      let contactQuery = supabase.from('Contact').select('id');
+      
+      if (validated.audienceType === "TAGS" && validated.audienceTags.length > 0) {
+        contactQuery = contactQuery.contains('tags', validated.audienceTags);
+      }
+
+      const { data: contactsToLink } = await contactQuery;
+
+      if (contactsToLink && contactsToLink.length > 0) {
+        const contactIds = contactsToLink.map(c => c.id);
+        // Usar a função auxiliar existente para vincular os contatos
+        await addContactsToCampaign(campaignId, contactIds);
+      }
+    }
 
     revalidatePath("/campaigns");
     return { success: true, campaignId };
