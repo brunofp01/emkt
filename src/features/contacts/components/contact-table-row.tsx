@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
@@ -53,6 +53,8 @@ export function ContactTableRow({ contact, campaigns, activeProviders }: Contact
   const [showEditForm, setShowEditForm] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const campaign = contact.campaignContacts[0];
   const lastEvent = contact.emailEvents[0];
@@ -68,6 +70,17 @@ export function ContactTableRow({ contact, campaigns, activeProviders }: Contact
       alert("Erro ao excluir contato.");
       setIsDeleting(false);
     }
+  };
+
+  const toggleMenu = () => {
+    if (!showMenu && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.right - 144 + window.scrollX, // 144 is the menu width (w-36)
+      });
+    }
+    setShowMenu(!showMenu);
   };
 
   const health = contact.emailEvents.length > 2 ? 'ACTIVE' : (contact.emailEvents.length > 0 ? 'PAUSED' : 'PENDING');
@@ -168,16 +181,20 @@ export function ContactTableRow({ contact, campaigns, activeProviders }: Contact
         <td className="px-4 py-3">
           <div className="relative">
             <button 
-              onClick={() => setShowMenu(!showMenu)}
+              ref={buttonRef}
+              onClick={toggleMenu}
               className="p-1.5 rounded-lg text-surface-600 hover:text-surface-300 hover:bg-surface-800/50 transition-all"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
             
-            {showMenu && (
+            {showMenu && typeof document !== 'undefined' && createPortal(
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-8 z-50 w-36 rounded-xl border border-surface-800/40 bg-surface-900/95 backdrop-blur-xl shadow-xl py-1 animate-fade-in">
+                <div 
+                  className="fixed z-50 w-36 rounded-xl border border-surface-800/40 bg-surface-900/95 backdrop-blur-xl shadow-2xl py-1 animate-in fade-in zoom-in duration-150"
+                  style={{ top: menuPosition.top, left: menuPosition.left }}
+                >
                   <button 
                     onClick={() => { setShowMenu(false); setShowEditForm(true); }}
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-xs font-medium text-surface-300 hover:bg-surface-800/60 hover:text-surface-100 transition-colors"
@@ -193,7 +210,8 @@ export function ContactTableRow({ contact, campaigns, activeProviders }: Contact
                     Excluir
                   </button>
                 </div>
-              </>
+              </>,
+              document.body
             )}
           </div>
         </td>
