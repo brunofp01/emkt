@@ -31,7 +31,7 @@ export default function DashboardLayout({
         isCollapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"
       )}>
         <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 mx-auto w-full max-w-screen-xl">{children}</main>
       </div>
     </div>
   );

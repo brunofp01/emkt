@@ -10,16 +10,19 @@ export function ProviderList({ providers }: { providers: any[] }) {
   const [editingProvider, setEditingProvider] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [providerType, setProviderType] = useState<"API_BREVO" | "SMTP">("SMTP");
+  const [accountTier, setAccountTier] = useState<string>("NOVA");
 
   const openNew = () => {
     setEditingProvider(null);
     setProviderType("SMTP");
+    setAccountTier("NOVA");
     setIsModalOpen(true);
   };
 
   const openEdit = (p: any) => {
     setEditingProvider(p);
     setProviderType(p.providerType);
+    setAccountTier(p.accountTier || "NOVA");
     setIsModalOpen(true);
   };
 
@@ -226,15 +229,20 @@ export function ProviderList({ providers }: { providers: any[] }) {
                     { value: "AQUECIDA", label: "🔥 Aquecida", desc: "Conta com 2+ semanas de uso", color: "border-blue-500/50 bg-blue-500/10" },
                     { value: "VETERANA", label: "⭐ Veterana", desc: "Conta estabelecida — sem limites de warmup", color: "border-emerald-500/50 bg-emerald-500/10" },
                   ].map(tier => (
-                    <label key={tier.value} className={`flex flex-col items-center p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.02] ${
-                      (editingProvider?.accountTier || "NOVA") === tier.value ? tier.color : 'border-surface-800 bg-surface-950'
-                    }`}>
-                      <input type="radio" name="accountTier" value={tier.value} defaultChecked={(editingProvider?.accountTier || "NOVA") === tier.value} className="sr-only" />
+                    <button
+                      key={tier.value}
+                      type="button"
+                      onClick={() => setAccountTier(tier.value)}
+                      className={`flex flex-col items-center p-3 rounded-xl border-2 cursor-pointer transition-all hover:scale-[1.02] ${
+                        accountTier === tier.value ? tier.color : 'border-surface-800 bg-surface-950'
+                      }`}
+                    >
                       <span className="text-sm font-bold text-surface-50">{tier.label}</span>
                       <span className="text-[10px] text-surface-400 text-center mt-1">{tier.desc}</span>
-                    </label>
+                    </button>
                   ))}
                 </div>
+                <input type="hidden" name="accountTier" value={accountTier} />
               </div>
 
               {providerType === "SMTP" && (
