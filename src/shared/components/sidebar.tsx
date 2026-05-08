@@ -30,13 +30,16 @@ const navItems = [
 
 export function Sidebar({ 
   isOpen, 
-  onClose 
+  onClose,
+  collapsed = false,
+  onToggleCollapse
 }: { 
   isOpen?: boolean; 
-  onClose?: () => void; 
+  onClose?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
@@ -126,7 +129,7 @@ export function Sidebar({
       {/* Collapse toggle (Desktop only) */}
       <div className="hidden lg:block border-t border-surface-800/60 p-3">
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={onToggleCollapse}
           className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-surface-500 transition-colors hover:bg-surface-800/60 hover:text-surface-300"
           aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
         >
