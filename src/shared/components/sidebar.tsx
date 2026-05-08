@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Server,
   Zap,
+  SendHorizonal,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contatos", icon: Users },
   { href: "/campaigns", label: "Campanhas", icon: Mail },
+  { href: "/queue", label: "Fila de Envio", icon: SendHorizonal },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings/providers", label: "Provedores", icon: Server },
 ] as const;

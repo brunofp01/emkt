@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/shared/lib/supabase";
-import { assignProvidersToContacts } from "@/features/email/lib/provider-selector";
 import { addContactsToCampaign } from "@/features/campaigns/actions/create-campaign";
 
 interface ImportContact {
@@ -17,23 +16,18 @@ export async function bulkImportContacts(contacts: ImportContact[], campaignId?:
   try {
     if (!contacts.length) return { success: true };
 
-    // 1. Obter provedores distribuídos para o tamanho do lote
-    const distributedProviders = await assignProvidersToContacts(contacts.length);
-
-    // 2. Preparar dados para o Supabase
-    // Usamos 'onConflict' para ignorar duplicatas ou atualizar se necessário.
-    // Aqui vamos apenas ignorar (do nothing) para manter a integridade do provedor original se já existir.
+    // 1. Preparar dados para o Supabase
     const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const now = new Date().toISOString();
 
-    const dataToInsert = contacts.map((c, index) => ({
+    const dataToInsert = contacts.map((c) => ({
       id: generateId(),
       email: c.email.toLowerCase().trim(),
       name: c.name || null,
       company: c.company || null,
       phone: c.phone || null,
       tags: c.tags || [],
-      provider: distributedProviders[index],
+      provider: "AUTO",
       status: 'ACTIVE',
       updatedAt: now,
     }));

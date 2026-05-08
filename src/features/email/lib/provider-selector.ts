@@ -1,62 +1,21 @@
 /**
- * Provider Selector — Balanceador Dinâmico com Score de Reputação
+ * Provider Selector — Roleta de Provedores na Saída
  * 
- * O sistema busca os provedores ativos no banco de dados e distribui contatos
- * de forma inteligente, priorizando contas com melhor reputação.
+ * O sistema seleciona o melhor provedor ATIVO no momento do envio,
+ * distribuindo emails de forma inteligente entre todas as contas.
  * 
- * Melhorias de deliverability:
- *   - Rotação ponderada por score de reputação (menos bounces = mais prioridade)
- *   - Integração com warmup engine para limites diários efetivos
- *   - Reset automático com tracking de tier
+ * Critérios de seleção:
+ *   - Score de reputação (menos bounces = mais prioridade)
+ *   - Peso configurado por conta
+ *   - Capacidade disponível (limite diário com warmup)
+ *   - Rotação para evitar concentração
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { getEffectiveDailyLimit, type AccountTier } from "@/features/email/lib/warmup-engine";
 
 /**
- * Busca a lista de IDs dos provedores ativos no banco.
- * A ordem é determinada pelo ID ou Data de Criação, garantindo determinismo.
- */
-async function getActiveOrderedProviders(): Promise<string[]> {
-  const { data: configs, error } = await supabaseAdmin
-    .from('ProviderConfig')
-    .select('provider')
-    .eq('isActive', true)
-    .order('createdAt', { ascending: true });
-
-  if (error) throw error;
-  if (!configs || configs.length === 0) {
-    throw new Error("Nenhum provedor de email ativo no banco (tabela ProviderConfig).");
-  }
-
-  return configs.map(c => c.provider);
-}
-
-/**
- * Conta quantos contatos já existem para cada provedor ativo.
- */
-async function getProviderCounts(providers: string[]): Promise<Map<string, number>> {
-  const countMap = new Map<string, number>();
-  
-  // Inicializa todos com 0
-  providers.forEach(p => countMap.set(p, 0));
-
-  // Tenta usar RPC primeiro (mais rápido)
-  const { data: distribution, error } = await supabaseAdmin.rpc('get_provider_distribution');
-  
-  if (!error && distribution) {
-    distribution.forEach((item: any) => {
-      if (countMap.has(item.provider)) {
-        countMap.set(item.provider, Number(item.count));
-      }
-    });
-  }
-
-  return countMap;
-}
-
-/**
  * Calcula o score de reputação de um provedor (0-100).
- * Score mais alto = conta mais saudável = deve receber mais contatos.
+ * Score mais alto = conta mais saudável = deve receber mais envios.
  */
 function calculateReputationScore(config: {
   totalSent: number;
@@ -83,13 +42,18 @@ function calculateReputationScore(config: {
 }
 
 /**
- * Seleciona o próximo provedor usando rotação ponderada por reputação.
- * Contas com melhor score recebem mais contatos.
+ * Seleciona o próximo provedor para envio usando roleta ponderada.
+ * Verifica capacidade disponível (limite diário) antes de selecionar.
+ * 
+ * Esta é a função principal chamada pelo send-email no momento do disparo.
  */
-export async function selectProviderForNewContact(): Promise<string> {
+export async function selectProviderForSend(): Promise<{
+  providerId: string;
+  providerConfig: any;
+}> {
   const { data: configs, error } = await supabaseAdmin
     .from('ProviderConfig')
-    .select('provider, totalSent, totalBounces, totalComplaints, accountTier, weight')
+    .select('*')
     .eq('isActive', true)
     .order('createdAt', { ascending: true });
 
@@ -98,11 +62,45 @@ export async function selectProviderForNewContact(): Promise<string> {
     throw new Error("Nenhum provedor de email ativo.");
   }
 
-  // Para uma única conta, retornar direto
-  if (configs.length === 1) return configs[0].provider;
+  // Filtrar provedores que ainda têm capacidade hoje
+  const now = new Date();
+  const available: typeof configs = [];
+
+  for (const config of configs) {
+    const lastReset = new Date(config.lastResetAt);
+    const isNewDay = now.toDateString() !== lastReset.toDateString();
+    
+    let currentSent = config.sentToday || 0;
+    if (isNewDay) {
+      currentSent = 0; // Será resetado no envio
+    }
+
+    const effectiveLimit = getEffectiveDailyLimit(
+      config.dailyLimit,
+      (config.accountTier || 'NOVA') as AccountTier,
+      new Date(config.warmupStartedAt || config.createdAt)
+    );
+
+    if (currentSent < effectiveLimit) {
+      available.push(config);
+    }
+  }
+
+  if (available.length === 0) {
+    // Nenhum provedor com capacidade — usar o que tem mais sobra
+    console.warn("[ProviderSelector] Todos os provedores atingiram o limite diário. Usando fallback.");
+    const fallback = configs[0];
+    return { providerId: fallback.provider, providerConfig: fallback };
+  }
+
+  // Para uma única conta disponível, retornar direto
+  if (available.length === 1) {
+    return { providerId: available[0].provider, providerConfig: available[0] };
+  }
 
   // Calcular peso ponderado (weight configurado × score de reputação)
-  const weighted = configs.map(c => ({
+  const weighted = available.map(c => ({
+    config: c,
     provider: c.provider,
     score: calculateReputationScore(c),
     weight: c.weight || 25,
@@ -117,12 +115,9 @@ export async function selectProviderForNewContact(): Promise<string> {
   const totalWeight = weighted.reduce((sum, w) => sum + w.effectiveWeight, 0);
 
   if (totalWeight === 0) {
-    // Fallback: round-robin simples se todos os scores são 0
-    const countMap = await getProviderCounts(configs.map(c => c.provider));
-    let totalContacts = 0;
-    countMap.forEach(count => totalContacts += count);
-    const nextIndex = totalContacts % configs.length;
-    return configs[nextIndex].provider;
+    // Fallback: round-robin simples
+    const idx = Math.floor(Math.random() * available.length);
+    return { providerId: available[idx].provider, providerConfig: available[idx] };
   }
 
   // Seleção aleatória ponderada
@@ -131,33 +126,22 @@ export async function selectProviderForNewContact(): Promise<string> {
   for (const w of weighted) {
     cumulative += w.effectiveWeight;
     if (random <= cumulative) {
-      console.log(`[ProviderSelector] Selecionado: ${w.provider} (score: ${w.score}, weight: ${w.effectiveWeight.toFixed(1)})`);
-      return w.provider;
+      console.log(`[ProviderSelector] Roleta: ${w.provider} (score: ${w.score}, weight: ${w.effectiveWeight.toFixed(1)})`);
+      return { providerId: w.provider, providerConfig: w.config };
     }
   }
 
   // Fallback improvável
-  return weighted[weighted.length - 1].provider;
+  const last = weighted[weighted.length - 1];
+  return { providerId: last.provider, providerConfig: last.config };
 }
 
 /**
- * Distribui N provedores para um lote de contatos em fila ordenada.
+ * Legacy: Seleciona provedor para um novo contato.
+ * Mantido para compatibilidade mas agora retorna "AUTO" por padrão.
  */
-export async function assignProvidersToContacts(count: number): Promise<string[]> {
-  const orderedProviders = await getActiveOrderedProviders();
-  const countMap = await getProviderCounts(orderedProviders);
-
-  let totalContacts = 0;
-  countMap.forEach(c => totalContacts += c);
-
-  const results: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const index = (totalContacts + i) % orderedProviders.length;
-    results.push(orderedProviders[index]);
-  }
-
-  console.log(`[ProviderSelector] Lote de ${count} contatos distribuído.`);
-  return results;
+export async function selectProviderForNewContact(): Promise<string> {
+  return "AUTO";
 }
 
 /**
@@ -185,7 +169,6 @@ export async function canProviderSendToday(provider: string): Promise<boolean> {
     return true;
   }
 
-  // Usar limite efetivo do warmup
   const effectiveLimit = getEffectiveDailyLimit(
     config.dailyLimit,
     (config.accountTier || 'NOVA') as AccountTier,

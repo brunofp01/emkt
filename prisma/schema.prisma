@@ -84,6 +84,7 @@ model CampaignContact {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   abVariant     String?
+  usedProvider  String?
   campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contact       Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
   currentStep   CampaignStep?      @relation(fields: [currentStepId], references: [id])

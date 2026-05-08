@@ -83,7 +83,7 @@ export async function createContact(
         company: validated.company,
         phone: validated.phone,
         tags: validated.tags ?? [],
-        provider: validated.provider || await selectProviderForNewContact(),
+        provider: validated.provider || "AUTO",
         updatedAt: new Date().toISOString(),
       }, { 
         onConflict: 'email',
