@@ -163,7 +163,8 @@ export function ContactTableRow({ contact, campaigns }: ContactTableRowProps) {
             company: contact.company,
             phone: contact.phone ?? null,
             tags: contact.tags,
-            status: contact.status
+            status: contact.status,
+            provider: contact.provider
           }}
         />,
         document.body

@@ -1,8 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity, Edit2 } from "lucide-react";
+import { X, Loader2, UserPlus, Mail, User, Building2, Phone, Tag, Activity, Edit2, Server } from "lucide-react";
 import { createContact, updateContact, type CreateContactState } from "@/features/contacts/actions/create-contact";
+import { PROVIDER_LABELS, PROVIDER_COLORS } from "@/shared/lib/constants";
 
 interface ContactFormProps {
   campaigns: Array<{ id: string; name: string }>;
@@ -15,6 +16,7 @@ interface ContactFormProps {
     phone: string | null;
     tags: string[];
     status: string;
+    provider?: string;
   };
 }
 
@@ -115,6 +117,22 @@ export function ContactForm({ onClose, campaigns, initialData }: ContactFormProp
                 <div className="relative group">
                   <Tag className={iconClass} />
                   <input id="contact-tags" name="tags" type="text" placeholder="ex: lead, vip, 2024" className={inputClass} defaultValue={initialData?.tags?.join(", ")} />
+                </div>
+              </div>
+
+              {/* Seletor de Provedor */}
+              <div>
+                <label htmlFor="contact-provider" className={labelClass}>Provedor de Email</label>
+                <div className="relative group">
+                  <Server className={iconClass} />
+                  <select id="contact-provider" name="provider" className={inputClass} defaultValue={initialData?.provider ?? ""}>
+                    {!isEditing && <option value="">Automático (Fila Ordenada)</option>}
+                    {Object.entries(PROVIDER_LABELS)
+                      .filter(([key]) => key !== 'USESEND')
+                      .map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

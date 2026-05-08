@@ -23,6 +23,7 @@ const createContactSchema = z.object({
   phone: z.string().optional(),
   tags: z.array(z.string()).optional(),
   campaignId: z.string().optional().nullable(),
+  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", ""]).optional(),
 });
 
 /** Schema de validação para atualização de contato */
@@ -33,6 +34,7 @@ const updateContactSchema = z.object({
   phone: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: z.enum(["ACTIVE", "PAUSED", "BOUNCED", "UNSUBSCRIBED", "COMPLAINED"]).optional(),
+  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", ""]).optional(),
 });
 
 export type CreateContactState = {
@@ -55,6 +57,7 @@ export async function createContact(
       company: (formData.get("company") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
       campaignId: (formData.get("campaignId") as string) || undefined,
+      provider: (formData.get("provider") as string) || undefined,
       tags: formData.get("tags")
         ? (formData.get("tags") as string).split(",").map((t) => t.trim()).filter(Boolean)
         : undefined,
@@ -80,7 +83,7 @@ export async function createContact(
         company: validated.company,
         phone: validated.phone,
         tags: validated.tags ?? [],
-        provider: await selectProviderForNewContact(),
+        provider: validated.provider || await selectProviderForNewContact(),
         updatedAt: new Date().toISOString(),
       }, { 
         onConflict: 'email',
@@ -137,6 +140,7 @@ export async function updateContact(
       company: (formData.get("company") as string) || undefined,
       phone: (formData.get("phone") as string) || undefined,
       status: (formData.get("status") as string) || undefined,
+      provider: (formData.get("provider") as string) || undefined,
       tags: formData.get("tags")
         ? (formData.get("tags") as string).split(",").map((t) => t.trim()).filter(Boolean)
         : undefined,
@@ -144,16 +148,19 @@ export async function updateContact(
 
     const validated = updateContactSchema.parse(rawData);
 
+    const updateData: any = {
+      name: validated.name,
+      company: validated.company,
+      phone: validated.phone,
+      status: validated.status,
+      tags: validated.tags,
+      updatedAt: new Date().toISOString(),
+    };
+    if (validated.provider) updateData.provider = validated.provider;
+
     const { error } = await supabase
       .from('Contact')
-      .update({
-        name: validated.name,
-        company: validated.company,
-        phone: validated.phone,
-        status: validated.status,
-        tags: validated.tags,
-        updatedAt: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', validated.id);
 
     if (error) throw error;

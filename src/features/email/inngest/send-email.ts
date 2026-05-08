@@ -124,7 +124,10 @@ export const sendEmail = inngest.createFunction(
 
     // 4. Persistência de Resultados (Atômico)
     await step.run("finalize-send", async () => {
+      const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
       await Promise.all([
+        // Atualizar status do CampaignContact
         supabaseAdmin
           .from('CampaignContact')
           .update({
@@ -133,6 +136,17 @@ export const sendEmail = inngest.createFunction(
             lastSentAt: new Date().toISOString(),
           })
           .eq('id', campaignContactId),
+        
+        // Registrar evento SENT na tabela EmailEvent (independente de webhook)
+        supabaseAdmin.from('EmailEvent').insert({
+          id: generateId(),
+          externalId: result.messageId || `sent_${campaignContactId}_${Date.now()}`,
+          contactId: contact.id,
+          messageId: result.messageId || 'direct-send',
+          provider: contact.provider,
+          eventType: "SENT",
+          timestamp: new Date().toISOString(),
+        }),
         
         incrementProviderSendCount(contact.provider)
       ]);
