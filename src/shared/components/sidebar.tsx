@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Users,
   Mail,
-  BarChart3,
   ChevronLeft,
   ChevronRight,
   Server,
@@ -23,7 +22,6 @@ const navItems = [
   { href: "/contacts", label: "Contatos", icon: Users },
   { href: "/campaigns", label: "Campanhas", icon: Mail },
   { href: "/queue", label: "Fila de Envio", icon: SendHorizonal },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings/providers", label: "Provedores", icon: Server },
 ] as const;
 

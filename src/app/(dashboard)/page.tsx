@@ -1,5 +1,6 @@
 /**
- * Dashboard Home — Premium analytics overview.
+ * Dashboard Home — Visão completa e consolidada da plataforma.
+ * Combina KPIs, gráficos, provedores, atividade recente e monitoramento de campanhas.
  */
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ import {
   ArrowDownRight,
   Eye,
   MousePointerClick,
+  BarChart3,
+  Info,
 } from "lucide-react";
 import { getDashboardStats } from "@/features/analytics/lib/queries";
 import { formatDate, calcPercentage } from "@/shared/lib/utils";
@@ -36,7 +39,6 @@ export default async function DashboardPage() {
         value: stats.totalContacts.toLocaleString("pt-BR"),
         icon: Users,
         gradient: "from-blue-500 to-indigo-600",
-        accent: "blue",
         trend: stats.growthData.length > 0 ? `+${stats.growthData[stats.growthData.length-1].count}` : "—",
         trendUp: true,
       },
@@ -45,7 +47,6 @@ export default async function DashboardPage() {
         value: stats.totalSent.toLocaleString("pt-BR"),
         icon: Mail,
         gradient: "from-cyan-500 to-blue-600",
-        accent: "cyan",
         trend: `${stats.deliveryRate || 0}% entregues`,
         trendUp: true,
       },
@@ -54,7 +55,6 @@ export default async function DashboardPage() {
         value: `${stats.openRate}%`,
         icon: Eye,
         gradient: "from-emerald-500 to-teal-600",
-        accent: "emerald",
         trend: stats.openRate > 20 ? "Excelente" : stats.openRate > 10 ? "Bom" : "Melhorar",
         trendUp: stats.openRate > 10,
       },
@@ -63,9 +63,24 @@ export default async function DashboardPage() {
         value: `${stats.clickRate}%`,
         icon: MousePointerClick,
         gradient: "from-violet-500 to-purple-600",
-        accent: "violet",
         trend: stats.clickRate > 3 ? "Acima da média" : "Normal",
         trendUp: stats.clickRate > 2,
+      },
+      {
+        label: "Cliques Totais",
+        value: stats.totalClicked.toLocaleString("pt-BR"),
+        icon: TrendingUp,
+        gradient: "from-cyan-500 to-blue-600",
+        trend: "Últimos 30 dias",
+        trendUp: true,
+      },
+      {
+        label: "Bounces",
+        value: stats.totalBounced.toLocaleString("pt-BR"),
+        icon: Info,
+        gradient: "from-amber-500 to-orange-600",
+        trend: stats.totalBounced === 0 ? "Ótimo" : "Monitorar",
+        trendUp: stats.totalBounced === 0,
       },
     ] as const;
 
@@ -78,6 +93,7 @@ export default async function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-50 tracking-tight">
               Dashboard
             </h1>
+            <p className="mt-1 text-sm text-surface-500">Inteligência consolidada e análise de performance.</p>
           </div>
           
           <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-900/60 border border-surface-800/40 rounded-full self-start sm:self-auto">
@@ -86,16 +102,12 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="dashboard-grid stagger-children">
+        {/* KPIs — 6 cards */}
+        <div className="grid gap-4 sm:gap-5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 stagger-children">
           {metricCards.map((card) => {
             const Icon = card.icon;
             return (
-              <div
-                key={card.label}
-                className="glass-card relative overflow-hidden group !p-5"
-              >
-                {/* Gradient accent line at bottom */}
+              <div key={card.label} className="glass-card relative overflow-hidden group !p-5 xl:col-span-1">
                 <div className={`absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r ${card.gradient} opacity-40 group-hover:opacity-80 transition-opacity`} />
                 
                 <div className="flex items-center justify-between mb-4">
@@ -103,8 +115,8 @@ export default async function DashboardPage() {
                     <Icon className="h-4 w-4 text-white" />
                   </div>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                    card.trendUp 
-                      ? "bg-emerald-500/10 text-emerald-400" 
+                    card.trendUp
+                      ? "bg-emerald-500/10 text-emerald-400"
                       : "bg-amber-500/10 text-amber-400"
                   }`}>
                     {card.trendUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -131,7 +143,7 @@ export default async function DashboardPage() {
           campaignPerformance={stats.campaignsPerformance}
         />
 
-        {/* Bottom row: Provider Health + Live Feed */}
+        {/* Bottom row: Provider Health + Campaign Monitoring + Live Feed */}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Provider Health */}
           <div className="glass-card !p-6">
@@ -148,13 +160,8 @@ export default async function DashboardPage() {
                   <div key={p.provider} className="group">
                     <div className="mb-1.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="h-2 w-2 rounded-full" 
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="text-xs font-semibold text-surface-300">
-                          {p.provider}
-                        </span>
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="text-xs font-semibold text-surface-300">{p.provider}</span>
                       </div>
                       <span className="text-[10px] text-surface-500 font-mono tabular-nums">
                         {p.count} leads
@@ -179,8 +186,30 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+          {/* Campaign Monitoring */}
+          <div className="glass-card !p-6">
+            <h2 className="mb-5 text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500 flex items-center gap-2">
+              <BarChart3 className="h-3.5 w-3.5 text-violet-400" />
+              Campanhas em Monitoramento
+            </h2>
+            <div className="space-y-2">
+              {stats.campaignsPerformance.map((campaign) => (
+                <div key={campaign.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-900/30 border border-surface-800/30 hover:border-surface-700/40 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`h-2 w-2 flex-shrink-0 rounded-full ${campaign.status === 'ACTIVE' ? 'bg-emerald-500 animate-dot-pulse' : 'bg-surface-600'}`} />
+                    <span className="text-xs font-semibold text-surface-200 truncate">{campaign.name}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-widest ml-2 flex-shrink-0">{campaign.status}</span>
+                </div>
+              ))}
+              {stats.campaignsPerformance.length === 0 && (
+                <p className="text-center py-10 text-xs text-surface-600 italic">Nenhuma campanha</p>
+              )}
+            </div>
+          </div>
+
           {/* Live Activity Feed */}
-          <div className="glass-card !p-6 lg:col-span-2">
+          <div className="glass-card !p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500 flex items-center gap-2">
                 <Zap className="h-3.5 w-3.5 text-amber-400" />
@@ -206,9 +235,7 @@ export default async function DashboardPage() {
                     <p className="text-[10px] text-surface-500 flex items-center gap-1.5 mt-0.5">
                       {formatDate(event.timestamp)} 
                       {event.clickedUrl && (
-                        <span className="text-primary-400 font-medium">
-                          • Clicou em link
-                        </span>
+                        <span className="text-primary-400 font-medium">• Clicou em link</span>
                       )}
                     </p>
                   </div>
@@ -232,13 +259,11 @@ export default async function DashboardPage() {
         <div className="mb-6 p-4 rounded-2xl bg-red-500/10 text-red-400">
           <Activity className="h-8 w-8" />
         </div>
-        <h2 className="text-xl font-bold text-surface-50">Falha na Sincronização</h2>
+        <h2 className="text-xl font-bold text-surface-50">Algo deu errado no Dashboard</h2>
         <p className="mt-2 max-w-md text-surface-400 text-sm">
-          Não conseguimos processar os dados analíticos.
+          Não conseguimos carregar estas informações agora. Isso pode ser uma falha temporária de conexão.
         </p>
-        <div className="mt-6 w-full max-w-xl overflow-hidden rounded-xl border border-surface-800 bg-surface-900/50 p-3 text-left font-mono text-[10px] text-red-400/80">
-          {error.message || String(error)}
-        </div>
+        <div className="mt-4 text-[10px] text-surface-600 font-mono">ID do Erro: {Math.floor(Math.random() * 9999999999)}</div>
       </div>
     );
   }
