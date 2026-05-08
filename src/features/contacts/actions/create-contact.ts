@@ -199,3 +199,61 @@ export async function deleteContact(contactId: string): Promise<CreateContactSta
     return { error: message };
   }
 }
+
+/**
+ * Remove múltiplos contatos em massa.
+ */
+export async function bulkDeleteContacts(ids: string[]): Promise<CreateContactState> {
+  try {
+    if (!ids.length) return { success: true };
+
+    const { error } = await supabase
+      .from('Contact')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+
+    revalidatePath("/contacts");
+    return { success: true };
+  } catch (err) {
+    console.error('Bulk delete error:', err);
+    return { error: "Erro ao excluir contatos selecionados." };
+  }
+}
+
+/**
+ * Adiciona tags a múltiplos contatos em massa sem remover as existentes.
+ */
+export async function bulkAddTagsToContacts(ids: string[], tags: string[]): Promise<CreateContactState> {
+  try {
+    if (!ids.length || !tags.length) return { success: true };
+
+    // Buscar contatos atuais para fazer o merge das tags
+    const { data: contacts, error: fetchError } = await supabase
+      .from('Contact')
+      .select('id, tags')
+      .in('id', ids);
+
+    if (fetchError) throw fetchError;
+
+    // Fazer o merge e update de cada um (em paralelo)
+    const updates = contacts.map(contact => {
+      const currentTags = Array.isArray(contact.tags) ? contact.tags : [];
+      const newTags = Array.from(new Set([...currentTags, ...tags]));
+      
+      return supabase
+        .from('Contact')
+        .update({ tags: newTags, updatedAt: new Date().toISOString() })
+        .eq('id', contact.id);
+    });
+
+    await Promise.all(updates);
+
+    revalidatePath("/contacts");
+    return { success: true };
+  } catch (err) {
+    console.error('Bulk tag error:', err);
+    return { error: "Erro ao adicionar tags aos contatos selecionados." };
+  }
+}

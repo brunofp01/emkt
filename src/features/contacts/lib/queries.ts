@@ -43,8 +43,19 @@ export async function getContacts(filters: ContactFilters = {}) {
     query = query.eq('status', status);
   }
 
-  // Segmentação Dinâmica: Filtro por Tags (Postgres Array Contains)
-  if (tag) {
+  // Filtros de Comportamento ou Tags
+  if (tag === "CLICKED") {
+    // Filtra contatos que têm pelo menos um evento de clique
+    query = supabase
+      .from('Contact')
+      .select('*, EmailEvent!inner(eventType), campaignContacts:CampaignContact(*, campaign:Campaign(name), currentStep:CampaignStep(stepOrder))', { count: 'exact' })
+      .eq('EmailEvent.eventType', 'CLICKED');
+  } else if (tag === "LEAD_QUENTE") {
+    // Para simplificar sem Views, consideramos LEAD_QUENTE se tiver tags ou status ativo
+    // (Melhoria: Em prod, isso deveria ser uma View calculada no Postgres)
+    query = query.not('tags', 'eq', '{}'); 
+  } else if (tag) {
+    // Filtro de Tag normal
     query = query.contains('tags', [tag]);
   }
 
@@ -117,5 +128,28 @@ export async function getContactCountsByProvider() {
     provider,
     _count: { _all: count }
   }));
+}
+
+/**
+ * Busca todas as tags únicas presentes na base de contatos.
+ */
+export async function getAvailableTags() {
+  const { data, error } = await supabase
+    .from('Contact')
+    .select('tags');
+
+  if (error) {
+    console.error('Erro ao buscar tags:', error);
+    return [];
+  }
+
+  const allTags = new Set<string>();
+  data.forEach(item => {
+    if (Array.isArray(item.tags)) {
+      item.tags.forEach(tag => allTags.add(tag));
+    }
+  });
+
+  return Array.from(allTags).sort();
 }
 
