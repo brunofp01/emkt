@@ -23,7 +23,7 @@ const createContactSchema = z.object({
   phone: z.string().optional(),
   tags: z.array(z.string()).optional(),
   campaignId: z.string().optional().nullable(),
-  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", ""]).optional(),
+  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", "GMAIL", ""]).optional(),
 });
 
 /** Schema de validação para atualização de contato */
@@ -34,7 +34,7 @@ const updateContactSchema = z.object({
   phone: z.string().optional(),
   tags: z.array(z.string()).optional(),
   status: z.enum(["ACTIVE", "PAUSED", "BOUNCED", "UNSUBSCRIBED", "COMPLAINED"]).optional(),
-  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", ""]).optional(),
+  provider: z.enum(["BREVO", "RESEND", "MAILGUN", "USESEND", "GMAIL", ""]).optional(),
 });
 
 export type CreateContactState = {

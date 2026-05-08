@@ -8,6 +8,7 @@ export const PROVIDER_LABELS = {
   USESEND: "useSend",
   BREVO: "Brevo",
   MAILGUN: "Mailgun",
+  GMAIL: "Gmail",
 } as const;
 
 /** Cores associadas a cada provedor para o dashboard */
@@ -16,6 +17,7 @@ export const PROVIDER_COLORS = {
   USESEND: "#8b5cf6",  // Violet
   BREVO: "#06b6d4",    // Cyan
   MAILGUN: "#f43f5e",  // Rose
+  GMAIL: "#ea4335",    // Google Red
 } as const;
 
 /** Mapeamento de status de contato para labels */

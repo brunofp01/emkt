@@ -9,12 +9,14 @@ import { resendProvider } from "./resend";
 import { usesendProvider } from "./usesend";
 import { brevoProvider } from "./brevo";
 import { mailgunProvider } from "./mailgun";
+import { gmailProvider } from "./gmail";
 
 const providers: Record<EmailProvider, EmailProviderAdapter> = {
   RESEND: resendProvider,
   USESEND: usesendProvider,
   BREVO: brevoProvider,
   MAILGUN: mailgunProvider,
+  GMAIL: gmailProvider,
 };
 
 /**

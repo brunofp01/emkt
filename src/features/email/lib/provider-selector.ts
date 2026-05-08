@@ -9,7 +9,7 @@ import type { EmailProvider } from "@/shared/types";
  * Ordem fixa dos provedores. O sistema percorre essa fila ciclicamente.
  * Para adicionar/remover um provedor, basta editar esta lista.
  */
-const PROVIDER_ORDER: EmailProvider[] = ["BREVO", "RESEND", "MAILGUN"];
+const PROVIDER_ORDER: EmailProvider[] = ["BREVO", "RESEND", "MAILGUN", "GMAIL"];
 
 /**
  * Busca a lista de provedores ativos no banco e retorna apenas os que

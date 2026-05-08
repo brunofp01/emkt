@@ -141,6 +141,7 @@ enum EmailProvider {
   USESEND
   BREVO
   MAILGUN
+  GMAIL
 }
 
 enum ContactStatus {
