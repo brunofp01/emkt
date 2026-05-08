@@ -77,7 +77,7 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
     console.error('[saveProvider Error]:', err);
     
     if (err instanceof z.ZodError) {
-      const firstError = err.errors[0]?.message || "Dados inválidos.";
+      const firstError = err.issues[0]?.message || "Dados inválidos.";
       return { error: firstError };
     }
     
