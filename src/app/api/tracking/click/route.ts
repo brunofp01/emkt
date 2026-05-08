@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 
+export const dynamic = "force-dynamic";
+
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 export async function GET(req: NextRequest) {
@@ -13,9 +15,9 @@ export async function GET(req: NextRequest) {
   const targetUrlEncoded = searchParams.get("url");
   const campaignContactId = searchParams.get("ccid");
 
-  // Decodificar URL do Base64
+  // Decodificar URL do Base64 (restaurar eventuais '+' que viraram espaços)
   const targetUrl = targetUrlEncoded 
-    ? Buffer.from(targetUrlEncoded, 'base64').toString('utf-8') 
+    ? Buffer.from(targetUrlEncoded.replace(/ /g, '+'), 'base64').toString('utf-8') 
     : null;
 
   if (!targetUrl || !campaignContactId) {

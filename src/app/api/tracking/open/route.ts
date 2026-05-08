@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 
+export const dynamic = "force-dynamic";
+
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 // Imagem 1x1 transparente (GIF)

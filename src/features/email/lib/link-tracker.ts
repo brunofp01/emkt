@@ -39,8 +39,8 @@ export function rewriteLinks({ html, campaignContactId, baseUrl }: RewriteLinksO
     }
 
     // Criar a URL de rastreamento
-    // Usamos Base64 para a URL de destino para evitar problemas com caracteres especiais na query string
-    const encodedUrl = Buffer.from(originalHref).toString('base64');
+    // Usamos Base64 + encodeURIComponent para evitar problemas com caracteres especiais na query string
+    const encodedUrl = encodeURIComponent(Buffer.from(originalHref).toString('base64'));
     const trackingUrl = `${baseUrl}/api/tracking/click?ccid=${campaignContactId}&url=${encodedUrl}`;
 
     $(element).attr('href', trackingUrl);
