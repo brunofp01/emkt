@@ -34,9 +34,21 @@ export async function setupDefaultProviders() {
 
   try {
     for (const p of providers) {
+      const { data: existing } = await supabaseAdmin
+        .from('ProviderConfig')
+        .select('id')
+        .eq('provider', p.provider)
+        .single();
+        
+      const payload = {
+        ...p,
+        id: existing?.id || crypto.randomUUID(),
+        updatedAt: new Date().toISOString()
+      };
+
       const { error } = await supabaseAdmin
         .from('ProviderConfig')
-        .upsert(p, { onConflict: 'provider' });
+        .upsert(payload, { onConflict: 'provider' });
       
       if (error) console.error(`Erro ao configurar ${p.provider}:`, error.message);
     }

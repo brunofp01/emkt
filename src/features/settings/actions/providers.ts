@@ -36,6 +36,7 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
       }
     }
 
+    const now = new Date().toISOString();
     const payload: any = {
       provider: data.provider,
       providerType: data.providerType,
@@ -46,6 +47,7 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
       smtpHost: data.smtpHost || null,
       smtpUser: data.smtpUser || null,
       smtpPort: data.smtpPort || null,
+      updatedAt: now,
     };
 
     // Só atualiza a senha se ela tiver sido informada
@@ -63,6 +65,7 @@ export async function saveProvider(prevState: ProviderActionState, formData: For
       if (error) throw error;
     } else {
       // Cria novo
+      payload.id = crypto.randomUUID();
       const { error } = await supabaseAdmin
         .from('ProviderConfig')
         .insert(payload);
@@ -96,7 +99,7 @@ export async function toggleProviderStatus(id: string, currentStatus: boolean): 
   try {
     const { error } = await supabaseAdmin
       .from('ProviderConfig')
-      .update({ isActive: !currentStatus })
+      .update({ isActive: !currentStatus, updatedAt: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
