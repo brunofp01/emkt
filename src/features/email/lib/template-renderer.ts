@@ -15,13 +15,31 @@ export interface TemplateVariables {
 }
 
 /**
- * Substitui variáveis {{key}} no template pelo valor correspondente.
- * Adiciona automaticamente o rodapé de descadastro para conformidade mundial (LGPD/CAN-SPAM).
+ * Substitui variáveis {{key}} no template de ASSUNTO.
+ * NÃO adiciona HTML, footer, ou qualquer estrutura.
+ * Usado exclusivamente para linhas de assunto.
+ */
+export function renderSubject(
+  subject: string,
+  variables: TemplateVariables
+): string {
+  if (!subject) return "";
+  return subject.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+    const value = variables[key];
+    return value ?? "";
+  });
+}
+
+/**
+ * Renderiza template de CORPO HTML do email.
+ * Substitui variáveis, adiciona footer de compliance e estrutura HTML.
  */
 export function renderTemplate(
   template: string,
   variables: TemplateVariables
 ): string {
+  if (!template) return "";
+
   // 1. Substituição de variáveis
   let rendered = template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
     const value = variables[key];

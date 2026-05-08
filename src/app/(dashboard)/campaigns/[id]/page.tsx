@@ -345,58 +345,153 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         </div>
       </div>
 
-      {/* Contatos na Régua */}
+      {/* Gestão da Fila de Envio */}
       <div className="glass-card p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400">Contatos na Régua</h2>
-          <Link href="/contacts" className="text-sm font-medium text-primary-400 hover:text-primary-300">
-            + Adicionar
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400 flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary-500" />
+              Fila de Envio
+            </h2>
+            <p className="text-xs text-surface-500 mt-1">
+              Acompanhe em tempo real o status de cada contato na campanha.
+            </p>
+          </div>
+          <Link href="/contacts" className="flex items-center gap-2 text-sm font-medium text-primary-400 hover:text-primary-300 bg-primary-500/10 px-3 py-1.5 rounded-lg border border-primary-500/20 transition-all hover:bg-primary-500/20">
+            + Adicionar Contatos
           </Link>
         </div>
+
+        {/* Cards de Status da Fila */}
+        {contacts.length > 0 && (() => {
+          const queued = contacts.filter((c: any) => c.stepStatus === 'QUEUED' || c.stepStatus === 'PENDING').length;
+          const sending = contacts.filter((c: any) => c.stepStatus === 'SENDING').length;
+          const sent = contacts.filter((c: any) => ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)).length;
+          const failed = contacts.filter((c: any) => ['BOUNCED', 'FAILED'].includes(c.stepStatus)).length;
+          
+          // Tempo estimado: contas NOVA = ~90s/email, AQUECIDA = ~60s, VETERANA = ~30s
+          const estimatedMinutes = Math.ceil(queued * 1.5); // ~90s por email na média
+
+          return (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Na Fila</p>
+                <p className="text-2xl font-black text-amber-400 mt-1">{queued}</p>
+                {queued > 0 && (
+                  <p className="text-[10px] text-surface-500 mt-1">
+                    ≈ {estimatedMinutes < 60 ? `${estimatedMinutes} min` : `${Math.ceil(estimatedMinutes / 60)}h`} restantes
+                  </p>
+                )}
+              </div>
+              <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Enviando</p>
+                <p className="text-2xl font-black text-blue-400 mt-1">{sending}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Enviados</p>
+                <p className="text-2xl font-black text-emerald-400 mt-1">{sent}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Falha</p>
+                <p className="text-2xl font-black text-red-400 mt-1">{failed}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-800/50 border border-surface-800">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-surface-400">Total</p>
+                <p className="text-2xl font-black text-surface-200 mt-1">{contacts.length}</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Info do Warmup */}
+        {contacts.some((c: any) => c.stepStatus === 'QUEUED' || c.stepStatus === 'PENDING') && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3">
+            <Clock className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-400">Sistema de Warmup Ativo</p>
+              <p className="text-[11px] text-surface-400 mt-1">
+                Para proteger a reputação das suas contas Gmail, os emails são enviados com intervalo de 30 a 120 segundos entre si. 
+                Contas novas (🌱) enviam até 20 emails/dia, crescendo progressivamente. Este é o comportamento esperado para evitar spam.
+              </p>
+            </div>
+          </div>
+        )}
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-surface-800 text-surface-500">
-                <th className="pb-3 font-medium">Contato</th>
-                <th className="pb-3 font-medium">Etapa Atual</th>
-                <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 font-medium">Última Atualização</th>
+              <tr className="border-b border-surface-800 text-[10px] font-bold uppercase tracking-widest text-surface-500">
+                <th className="pb-3">Contato</th>
+                <th className="pb-3">Etapa Atual</th>
+                <th className="pb-3">Status</th>
+                <th className="pb-3">Provedor</th>
+                <th className="pb-3">Enviado em</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800/50 text-surface-300">
               {contacts.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-surface-500">
-                    Nenhum contato adicionado a esta campanha.
+                  <td colSpan={5} className="py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-surface-900 flex items-center justify-center border border-surface-800">
+                        <Users className="h-6 w-6 text-surface-700" />
+                      </div>
+                      <p className="text-sm text-surface-500">Nenhum contato adicionado a esta campanha.</p>
+                      <Link href="/contacts" className="text-xs font-bold text-primary-400 hover:text-primary-300">
+                        + Adicionar contatos
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                contacts.map((cc: any) => (
-                  <tr key={cc.id} className="group hover:bg-surface-900/30">
-                    <td className="py-3">
-                      <Link href={`/contacts/${cc.contact?.id}`} className="font-medium text-primary-400 hover:underline">
-                        {cc.contact?.email || "Email Indisponível"}
-                      </Link>
-                      {cc.contact?.name && <p className="text-xs text-surface-500">{cc.contact.name}</p>}
-                    </td>
-                    <td className="py-3">
-                      {cc.currentStep ? (
-                        <span>Email {cc.currentStep.stepOrder}</span>
-                      ) : "Concluído"}
-                    </td>
-                    <td className="py-3">
-                      <StatusBadge 
-                        status={cc.stepStatus || "PENDING"} 
-                        label={STEP_STATUS_LABELS[cc.stepStatus as keyof typeof STEP_STATUS_LABELS] || cc.stepStatus} 
-                        dot 
-                      />
-                    </td>
-                    <td className="py-3 text-xs text-surface-500">
-                      {cc.updatedAt ? formatDate(cc.updatedAt) : "-"}
-                    </td>
-                  </tr>
-                ))
+                contacts.map((cc: any) => {
+                  const statusConfig: Record<string, { color: string; label: string; pulse: boolean }> = {
+                    'PENDING': { color: 'bg-surface-500', label: 'Pendente', pulse: false },
+                    'QUEUED': { color: 'bg-amber-500', label: 'Na Fila', pulse: true },
+                    'SENDING': { color: 'bg-blue-500', label: 'Enviando...', pulse: true },
+                    'SENT': { color: 'bg-emerald-500', label: 'Enviado', pulse: false },
+                    'DELIVERED': { color: 'bg-emerald-500', label: 'Entregue', pulse: false },
+                    'OPENED': { color: 'bg-cyan-500', label: 'Aberto', pulse: false },
+                    'CLICKED': { color: 'bg-violet-500', label: 'Clicou', pulse: false },
+                    'BOUNCED': { color: 'bg-red-500', label: 'Bounce', pulse: false },
+                    'FAILED': { color: 'bg-red-500', label: 'Falhou', pulse: false },
+                  };
+                  const status = statusConfig[cc.stepStatus] || statusConfig['PENDING'];
+                  
+                  return (
+                    <tr key={cc.id} className="group hover:bg-surface-900/30 transition-colors">
+                      <td className="py-3">
+                        <Link href={`/contacts/${cc.contact?.id}`} className="font-medium text-primary-400 hover:underline">
+                          {cc.contact?.email || "Email Indisponível"}
+                        </Link>
+                        {cc.contact?.name && <p className="text-xs text-surface-500">{cc.contact.name}</p>}
+                      </td>
+                      <td className="py-3">
+                        {cc.currentStep ? (
+                          <span className="text-xs font-medium">Email {cc.currentStep.stepOrder}</span>
+                        ) : <span className="text-xs text-surface-500">—</span>}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-2 w-2 rounded-full ${status.color} ${status.pulse ? 'animate-pulse' : ''}`} />
+                          <span className="text-xs font-bold">{status.label}</span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">
+                          {cc.contact?.provider || "—"}
+                        </span>
+                      </td>
+                      <td className="py-3 text-xs text-surface-500">
+                        {cc.lastSentAt ? formatDate(cc.lastSentAt) : (
+                          cc.stepStatus === 'QUEUED' ? (
+                            <span className="text-amber-400/70 text-[10px]">Aguardando warmup...</span>
+                          ) : "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

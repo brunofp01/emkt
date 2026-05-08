@@ -12,7 +12,7 @@
 import { inngest } from "@/shared/lib/inngest";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
-import { renderTemplate, generateUnsubscribeUrl } from "@/features/email/lib/template-renderer";
+import { renderTemplate, renderSubject, generateUnsubscribeUrl } from "@/features/email/lib/template-renderer";
 import { incrementProviderSendCount } from "@/features/email/lib/provider-selector";
 import { rewriteLinks } from "@/features/email/lib/link-tracker";
 import { env } from "@/shared/lib/env";
@@ -177,7 +177,7 @@ export const sendEmail = inngest.createFunction(
       unsubscribeUrl,
     };
 
-    const renderedSubject = renderTemplate(selectedSubject, templateVars);
+    const renderedSubject = renderSubject(selectedSubject, templateVars);
     const renderedHtml = renderTemplate(selectedHtml, templateVars);
 
     const trackedHtml = await step.run("apply-link-tracking", async () => {

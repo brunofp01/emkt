@@ -35,19 +35,19 @@ const DEFAULT_TEMPLATE = `
 const campaignStepSchema = z.object({
   stepOrder: z.number().int().positive(),
   subject: z.string().min(1, "Assunto obrigatório"),
-  htmlBody: z.string(),
-  textBody: z.string().optional(),
-  design: z.any().optional(),
+  htmlBody: z.string().default(""),
+  textBody: z.string().nullable().optional(),
+  design: z.any().nullable().optional(),
   delayHours: z.number().int().min(0).default(0),
   isABTest: z.boolean().default(false),
-  subjectB: z.string().optional(),
-  htmlBodyB: z.string().optional(),
-  designB: z.any().optional(),
+  subjectB: z.string().nullable().optional(),
+  htmlBodyB: z.string().nullable().optional(),
+  designB: z.any().nullable().optional(),
 });
 
 const createCampaignSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   steps: z.array(campaignStepSchema).min(1, "Pelo menos uma etapa é necessária"),
 });
 

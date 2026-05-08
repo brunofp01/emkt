@@ -69,8 +69,8 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns, act
 
   return (
     <>
-      {showForm && <ContactForm campaigns={campaigns} activeProviders={activeProviders} onClose={() => setShowForm(false)} />}
-      {showImport && <ImportModal campaigns={campaigns} onClose={() => setShowImport(false)} />}
+      {showForm && <ContactForm key={`form-${Date.now()}`} campaigns={campaigns} activeProviders={activeProviders} onClose={() => { setShowForm(false); window.location.reload(); }} />}
+      {showImport && <ImportModal key={`import-${Date.now()}`} campaigns={campaigns} onClose={() => { setShowImport(false); window.location.reload(); }} />}
 
       <div className="space-y-6">
         {/* Header de Ações Principais */}
