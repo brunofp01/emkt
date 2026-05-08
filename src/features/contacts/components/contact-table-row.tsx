@@ -4,7 +4,7 @@ import Link from "next/link";
 import { STEP_STATUS_LABELS, EVENT_TYPE_LABELS } from "@/shared/lib/constants";
 import { formatDate } from "@/shared/lib/utils";
 import { StatusBadge } from "@/shared/components/status-badge";
-import { Tag, Building2, User, ChevronRight, Activity, Calendar, MoreHorizontal, Trash2, Edit2, Loader2 } from "lucide-react";
+import { Building2, Activity, Calendar, MoreHorizontal, Trash2, Edit2, Loader2 } from "lucide-react";
 import { deleteContact } from "@/features/contacts/actions/create-contact";
 import { ContactForm } from "./contact-form";
 
@@ -30,126 +30,171 @@ interface ContactTableRowProps {
   activeProviders: Array<{ id: string; type: string }>;
 }
 
+// Generate a consistent color from a string hash
+function hashColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 50%, 60%)`;
+}
+
+function getInitials(name: string | null, email: string): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  return email.substring(0, 2).toUpperCase();
+}
+
 export function ContactTableRow({ contact, campaigns, activeProviders }: ContactTableRowProps) {
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const providerLabel = contact.provider;
-  const providerColor = "#6b7280"; // fallback color since it's dynamic now
   const campaign = contact.campaignContacts[0];
   const lastEvent = contact.emailEvents[0];
+  const avatarColor = hashColor(contact.email);
+  const initials = getInitials(contact.name, contact.email);
 
   const handleDelete = async () => {
-    if (!confirm(`Tem certeza que deseja excluir o contato ${contact.email}?`)) return;
+    if (!confirm(`Excluir ${contact.email}?`)) return;
     setIsDeleting(true);
     try {
       await deleteContact(contact.id);
-    } catch (err) {
+    } catch {
       alert("Erro ao excluir contato.");
       setIsDeleting(false);
     }
   };
 
-  // Calcular "Saúde" do Lead baseada em eventos (exemplo simples)
   const health = contact.emailEvents.length > 2 ? 'ACTIVE' : (contact.emailEvents.length > 0 ? 'PAUSED' : 'PENDING');
 
   return (
     <>
-      <tr className="group transition-all hover:bg-surface-800/30">
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-800 border border-surface-700 text-surface-500 group-hover:border-primary-500/30 group-hover:bg-primary-500/5 group-hover:text-primary-500 transition-all">
-              <User className="h-5 w-5" />
+      <tr className="group transition-colors hover:bg-surface-800/20">
+        {/* Contact: Avatar + Email + Tags */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div 
+              className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold text-white/90 transition-transform group-hover:scale-105"
+              style={{ backgroundColor: avatarColor }}
+            >
+              {initials}
             </div>
             <div className="min-w-0">
-              <Link href={`/contacts/${contact.id}`} className="text-sm font-bold text-surface-50 hover:text-primary-400 transition-colors block truncate">
+              <Link href={`/contacts/${contact.id}`} className="text-sm font-semibold text-surface-100 hover:text-primary-400 transition-colors block truncate">
                 {contact.email}
               </Link>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {contact.tags?.slice(0, 3).map(tag => (
-                  <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-800 text-surface-400 border border-surface-700 text-[9px] font-black uppercase tracking-widest">
-                    {tag}
-                  </span>
-                ))}
-                {contact.tags?.length > 3 && (
-                  <span className="text-[9px] font-black text-surface-600">+{contact.tags.length - 3}</span>
-                )}
-              </div>
+              {contact.tags?.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {contact.tags.slice(0, 2).map(tag => (
+                    <span 
+                      key={tag} 
+                      className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider bg-surface-800/80 text-surface-400 border border-surface-800/40"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {contact.tags.length > 2 && (
+                    <span className="text-[9px] font-semibold text-surface-600">+{contact.tags.length - 2}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </td>
         
-        <td className="hidden px-6 py-4 md:table-cell">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-3.5 w-3.5 text-surface-600" />
+        {/* Company */}
+        <td className="hidden md:table-cell px-4 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Building2 className="h-3 w-3 text-surface-600 shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-surface-300 truncate">{contact.name ?? "Sem Nome"}</p>
-              <p className="text-[10px] text-surface-500 truncate uppercase tracking-wider">{contact.company ?? "—"}</p>
+              <p className="text-xs font-medium text-surface-300 truncate">{contact.name ?? "—"}</p>
+              <p className="text-[10px] text-surface-500 truncate">{contact.company ?? "—"}</p>
             </div>
           </div>
         </td>
 
-        <td className="px-6 py-4">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-900 border border-surface-800/60">
-            <span className="h-2 w-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: providerColor }} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-surface-400">{providerLabel}</span>
-          </div>
+        {/* Provider */}
+        <td className="px-4 py-3">
+          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-900/60 border border-surface-800/30 text-[10px] font-semibold text-surface-400 uppercase tracking-wider">
+            <span className="h-1.5 w-1.5 rounded-full bg-surface-500" />
+            {contact.provider}
+          </span>
         </td>
 
-        <td className="hidden px-6 py-4 lg:table-cell">
+        {/* Campaign engagement */}
+        <td className="hidden lg:table-cell px-4 py-3">
           {campaign ? (
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500">
-                <Activity className="h-4 w-4" />
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-500/10 text-primary-400">
+                <Activity className="h-3.5 w-3.5" />
               </div>
-              <div>
-                <p className="text-[11px] font-bold text-surface-200">{campaign.campaign.name}</p>
-                <p className="text-[10px] text-surface-500 uppercase tracking-tighter">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-surface-200 truncate">{campaign.campaign.name}</p>
+                <p className="text-[10px] text-surface-500">
                   Etapa {campaign.currentStep?.stepOrder ?? "?"} • {STEP_STATUS_LABELS[campaign.stepStatus as keyof typeof STEP_STATUS_LABELS] ?? campaign.stepStatus}
                 </p>
               </div>
             </div>
           ) : (
-            <span className="text-[10px] font-bold text-surface-700 uppercase tracking-widest italic">Fora de régua</span>
+            <span className="text-[10px] text-surface-600 italic">Sem campanha</span>
           )}
         </td>
 
-        <td className="px-6 py-4">
+        {/* Status */}
+        <td className="px-4 py-3">
           {lastEvent ? (
             <div className="flex flex-col items-start gap-1">
               <StatusBadge status={lastEvent.eventType} label={EVENT_TYPE_LABELS[lastEvent.eventType as keyof typeof EVENT_TYPE_LABELS] ?? lastEvent.eventType} size="sm" dot />
-              <span className="text-[9px] text-surface-600 flex items-center gap-1 ml-1">
-                <Calendar className="h-2 w-2" /> {formatDate(lastEvent.timestamp)}
+              <span className="text-[9px] text-surface-600 flex items-center gap-1 ml-0.5">
+                <Calendar className="h-2.5 w-2.5" /> {formatDate(lastEvent.timestamp)}
               </span>
             </div>
           ) : (
-            <span className="text-[10px] font-bold text-surface-600 uppercase tracking-widest">Nenhuma ação</span>
+            <span className="text-[10px] text-surface-600">—</span>
           )}
         </td>
 
-        <td className="px-6 py-4 text-center">
-          <div className="flex justify-center">
-            <StatusBadge status={health} label={health === 'ACTIVE' ? 'Quente' : (health === 'PAUSED' ? 'Morno' : 'Frio')} size="sm" dot />
-          </div>
+        {/* Health */}
+        <td className="px-4 py-3 text-center">
+          <StatusBadge status={health} label={health === 'ACTIVE' ? 'Quente' : (health === 'PAUSED' ? 'Morno' : 'Frio')} size="sm" dot />
         </td>
 
-        <td className="px-6 py-4 text-right">
-          <div className="flex justify-end gap-2">
+        {/* Actions menu */}
+        <td className="px-4 py-3">
+          <div className="relative">
             <button 
-              onClick={() => setShowEditForm(true)}
-              className="p-2 text-surface-600 hover:text-primary-400 hover:bg-primary-500/5 rounded-xl transition-all"
-              title="Editar"
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-1.5 rounded-lg text-surface-600 hover:text-surface-300 hover:bg-surface-800/50 transition-all"
             >
-              <Edit2 className="h-4.5 w-4.5" />
+              <MoreHorizontal className="h-4 w-4" />
             </button>
-            <button 
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="p-2 text-surface-600 hover:text-red-400 hover:bg-red-500/5 rounded-xl transition-all disabled:opacity-30"
-              title="Excluir"
-            >
-              {isDeleting ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <Trash2 className="h-4.5 w-4.5" />}
-            </button>
+            
+            {showMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                <div className="absolute right-0 top-8 z-50 w-36 rounded-xl border border-surface-800/40 bg-surface-900/95 backdrop-blur-xl shadow-xl py-1 animate-fade-in">
+                  <button 
+                    onClick={() => { setShowMenu(false); setShowEditForm(true); }}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-xs font-medium text-surface-300 hover:bg-surface-800/60 hover:text-surface-100 transition-colors"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" /> Editar
+                  </button>
+                  <button 
+                    onClick={() => { setShowMenu(false); handleDelete(); }}
+                    disabled={isDeleting}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                  >
+                    {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    Excluir
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </td>
       </tr>
@@ -174,4 +219,3 @@ export function ContactTableRow({ contact, campaigns, activeProviders }: Contact
     </>
   );
 }
-

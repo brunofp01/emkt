@@ -144,6 +144,7 @@ export async function getDashboardStats() {
     openRate: calcPercentage(totalOpened, totalSent),
     clickRate: calcPercentage(totalClicked, totalOpened),
     bounceRate: calcPercentage(totalBounced, totalSent),
+    deliveryRate: calcPercentage(totalDelivered, totalSent),
     funnelData,
     trendData,
     growthData,

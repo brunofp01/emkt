@@ -75,8 +75,8 @@ export default function NewCampaignPage() {
     }
   };
 
-  const inputClass = "h-10 w-full rounded-lg border border-surface-800 bg-surface-900/50 px-4 text-sm text-surface-200 placeholder:text-surface-600 focus:border-primary-500/50 focus:outline-none focus:ring-1 focus:ring-primary-500/20";
-  const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wider text-surface-400";
+  const inputClass = "input-base h-10";
+  const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500";
 
   if (editingStepIndex !== null) {
     const currentStep = steps[editingStepIndex];
@@ -93,16 +93,14 @@ export default function NewCampaignPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 animate-fade-in pb-20">
-      <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
+    <div className="mx-auto max-w-4xl space-y-6 animate-fade-in pb-24">
+      <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-surface-50">Nova Campanha</h1>
-          <p className="mt-1 text-sm text-surface-500">Arquitete sua régua de prospecção com design de nível mundial.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-extrabold text-surface-50 tracking-tight">Nova Campanha</h1>
+        <p className="mt-1 text-sm text-surface-500">Crie sua régua de prospecção.</p>
       </div>
 
       {state.error && (
@@ -114,8 +112,8 @@ export default function NewCampaignPage() {
       <form action={(fd) => {
         fd.set("steps", JSON.stringify(steps));
         formAction(fd);
-      }} className="space-y-8">
-        <div className="glass-card p-8 space-y-6">
+      }} className="space-y-6">
+        <div className="glass-card !p-6 space-y-5">
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className={labelClass}>Nome da Campanha *</label>
@@ -136,32 +134,30 @@ export default function NewCampaignPage() {
               <div className="absolute left-0 top-0 h-full w-1 bg-primary-500/30 group-hover:bg-primary-500 transition-colors" />
               
               <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500/10 text-sm font-bold text-primary-400 border border-primary-500/20">{step.stepOrder}</div>
-                    <span className="text-base font-semibold text-surface-100">Etapa {step.stepOrder}</span>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-500/10 text-sm font-bold text-primary-400 border border-primary-500/20">{step.stepOrder}</div>
+                    <span className="text-sm font-semibold text-surface-200">Etapa {step.stepOrder}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => updateStep(idx, "isABTest", !step.isABTest)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all ${step.isABTest ? 'bg-primary-500/10 border-primary-500 text-primary-400' : 'bg-surface-800 border-surface-700 text-surface-500 hover:text-surface-300'}`}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold uppercase transition-all ${step.isABTest ? 'bg-primary-500/10 border-primary-500/30 text-primary-400' : 'bg-surface-800/50 border-surface-800 text-surface-500 hover:text-surface-300'}`}
                     >
-                      <Split className="h-3 w-3" /> {step.isABTest ? "A/B Ativo" : "Ativar Teste A/B"}
+                      <Split className="h-3 w-3" /> {step.isABTest ? "A/B" : "A/B"}
                     </button>
                     {steps.length > 1 && (
-                      <button type="button" onClick={() => removeStep(idx)} className="rounded-lg p-2 text-surface-600 hover:bg-red-500/10 hover:text-red-400 transition-all">
-                        <Trash2 className="h-5 w-5" />
+                      <button type="button" onClick={() => removeStep(idx)} className="rounded-lg p-1.5 text-surface-600 hover:bg-red-500/10 hover:text-red-400 transition-all">
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                   </div>
                 </div>
 
                 {/* Versão A */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-[0.2em]">
-                    <span>Variante A (Controle)</span>
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-surface-500 uppercase tracking-[0.15em]">Variante A</p>
                   <div className="grid gap-6 lg:grid-cols-12">
                     <div className="lg:col-span-8">
                       <label className={labelClass}>Assunto Variante A *</label>
@@ -172,17 +168,17 @@ export default function NewCampaignPage() {
                       <input type="number" min={0} value={step.delayHours} disabled={idx === 0} onChange={(e) => updateStep(idx, "delayHours", parseInt(e.target.value) || 0)} className={`${inputClass} disabled:opacity-30`} />
                     </div>
                   </div>
-                  <button type="button" onClick={() => { setEditingVariant("A"); setEditingStepIndex(idx); }} className="flex items-center gap-2 text-xs font-bold text-primary-400 hover:text-primary-300">
+                  <button type="button" onClick={() => { setEditingVariant("A"); setEditingStepIndex(idx); }} className="flex items-center gap-1.5 text-xs font-semibold text-primary-400 hover:text-primary-300 transition-colors">
                     <Layout className="h-3 w-3" /> {step.design ? 'Editar Design A' : 'Criar Design A'}
                   </button>
                 </div>
 
                 {/* Versão B (Condicional) */}
                 {step.isABTest && (
-                  <div className="pt-6 border-t border-surface-800/50 space-y-4 animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-violet-400 uppercase tracking-[0.2em]">
-                      <Split className="h-3 w-3" /> Variante B (Desafiante)
-                    </div>
+                  <div className="pt-5 border-t border-surface-800/40 space-y-3 animate-in slide-in-from-top-2">
+                    <p className="text-[10px] font-bold text-violet-400 uppercase tracking-[0.15em] flex items-center gap-1.5">
+                      <Split className="h-3 w-3" /> Variante B
+                    </p>
                     <div className="grid gap-6">
                       <div>
                         <label className={labelClass}>Assunto Variante B *</label>
@@ -230,19 +226,19 @@ export default function NewCampaignPage() {
             </div>
           ))}
 
-          <button type="button" onClick={addStep} className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-dashed border-surface-800 py-6 text-sm font-medium text-surface-500 hover:border-primary-500/30 hover:bg-primary-500/5 hover:text-primary-400 transition-all group">
-            <Plus className="h-5 w-5" /> Adicionar Próxima Etapa
+          <button type="button" onClick={addStep} className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-surface-800/60 py-5 text-sm font-medium text-surface-500 hover:border-primary-500/30 hover:bg-primary-500/5 hover:text-primary-400 transition-all">
+            <Plus className="h-4 w-4" /> Adicionar Etapa
           </button>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-950/80 backdrop-blur-md border-t border-surface-800 py-4 px-6">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface-950/90 backdrop-blur-xl border-t border-surface-800/40 py-3 px-4 sm:px-6">
           <div className="mx-auto max-w-4xl flex justify-end">
             <button 
               type="submit" 
               disabled={isPending || steps.some(s => !s.subject || (s.isABTest && !s.subjectB))} 
-              className="flex items-center justify-center gap-3 rounded-lg bg-primary-600 px-8 py-3 text-base font-bold text-white shadow-xl shadow-primary-600/20 hover:bg-primary-500 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="btn btn-primary !px-6 !py-2.5"
             >
-              {isPending ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando...</> : <><Mail className="h-5 w-5" /> Salvar Campanha Profissional</>}
+              {isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</> : <><Mail className="h-4 w-4" /> Salvar Campanha</>}
             </button>
           </div>
         </div>

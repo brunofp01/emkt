@@ -131,24 +131,24 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const stepMetrics = await getStepMetrics(id, steps, contacts.length);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
+    <div className="space-y-6 animate-fade-in pb-10">
+      <Link href="/campaigns" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      {/* Header da Campanha */}
-      <div className="glass-card p-6">
+      {/* Header */}
+      <div className="glass-card !p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-surface-50">{campaign.name}</h1>
-            {campaign.description && <p className="mt-1 text-sm text-surface-400">{campaign.description}</p>}
-            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-surface-500">
-              <span className="flex items-center gap-1"><Mail className="h-4 w-4" /> {steps.length} emails</span>
-              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {contacts.length} contatos</span>
-              <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> Criada em {formatDate(campaign.createdAt)}</span>
+            <h1 className="text-2xl font-extrabold text-surface-50 tracking-tight">{campaign.name}</h1>
+            {campaign.description && <p className="mt-1 text-sm text-surface-500">{campaign.description}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-surface-500">
+              <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {steps.length} etapas</span>
+              <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {contacts.length} contatos</span>
+              <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {formatDate(campaign.createdAt)}</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge 
               status={campaign.status || "DRAFT"} 
               label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] || campaign.status} 
@@ -161,8 +161,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   "use server";
                   await activateCampaign(campaign.id);
                 }} className="flex-1 sm:flex-none">
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-success px-4 py-2 text-sm font-bold text-white shadow-lg shadow-success/20 hover:bg-success/90 active:scale-[0.97] transition-all">
-                    <Play className="h-4 w-4" /> <span className="whitespace-nowrap">Ativar Campanha</span>
+                  <button type="submit" className="btn w-full !bg-emerald-600 !text-white !shadow-emerald-600/20 hover:!bg-emerald-500 text-xs">
+                    <Play className="h-3.5 w-3.5" /> Ativar
                   </button>
                 </form>
               )}
@@ -171,8 +171,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   "use server";
                   await pauseCampaign(campaign.id);
                 }} className="flex-1 sm:flex-none">
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-warning px-4 py-2 text-sm font-bold text-white shadow-lg shadow-warning/20 hover:bg-warning/90 active:scale-[0.97] transition-all">
-                    <Pause className="h-4 w-4" /> Pausar
+                  <button type="submit" className="btn w-full !bg-amber-600 !text-white !shadow-amber-600/20 hover:!bg-amber-500 text-xs">
+                    <Pause className="h-3.5 w-3.5" /> Pausar
                   </button>
                 </form>
               )}
@@ -181,13 +181,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   "use server";
                   await activateCampaign(campaign.id);
                 }} className="flex-1 sm:flex-none">
-                  <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 active:scale-[0.97] transition-all">
-                    <RotateCcw className="h-4 w-4" /> Retomar
+                  <button type="submit" className="btn btn-primary w-full text-xs">
+                    <RotateCcw className="h-3.5 w-3.5" /> Retomar
                   </button>
                 </form>
               )}
-              <Link href={`/campaigns/${campaign.id}/analytics`} className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg border border-surface-700 bg-surface-800 px-4 py-2 text-sm font-bold text-surface-200 hover:bg-surface-700 active:scale-[0.97] transition-all">
-                <BarChart3 className="h-4 w-4" /> <span className="whitespace-nowrap">Analytics</span>
+              <Link href={`/campaigns/${campaign.id}/analytics`} className="btn btn-secondary text-xs flex-1 sm:flex-none">
+                <BarChart3 className="h-3.5 w-3.5" /> Analytics
               </Link>
             </div>
           </div>
@@ -195,9 +195,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       </div>
 
       {/* Barras de Status por Etapa */}
-      <div className="glass-card p-6">
-        <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider text-surface-400 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-primary-500" />
+      <div className="glass-card !p-6">
+        <h2 className="mb-5 text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500 flex items-center gap-2">
+          <BarChart3 className="h-3.5 w-3.5 text-primary-400" />
           Performance por Etapa
         </h2>
         <div className="space-y-6">
@@ -208,7 +208,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             const clickedPct = metric.total > 0 ? Math.round((metric.clicked / metric.total) * 100) : 0;
 
             return (
-              <div key={metric.stepId} className="p-4 rounded-xl bg-surface-900/30 border border-surface-800/50">
+              <div key={metric.stepId} className="p-4 rounded-xl bg-surface-900/30 border border-surface-800/30 hover:border-surface-700/50 transition-colors">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500 text-xs font-black">
                     {metric.stepOrder}
@@ -367,18 +367,18 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       </div>
 
       {/* Gestão da Fila de Envio */}
-      <div className="glass-card p-6">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="glass-card !p-6">
+        <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-surface-400 flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary-500" />
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500 flex items-center gap-2">
+              <Users className="h-3.5 w-3.5 text-primary-400" />
               Fila de Envio
             </h2>
-            <p className="text-xs text-surface-500 mt-1">
-              Acompanhe em tempo real o status de cada contato na campanha.
+            <p className="text-[11px] text-surface-600 mt-1">
+              Status de cada contato na campanha.
             </p>
           </div>
-          <Link href="/contacts" className="flex items-center gap-2 text-sm font-medium text-primary-400 hover:text-primary-300 bg-primary-500/10 px-3 py-1.5 rounded-lg border border-primary-500/20 transition-all hover:bg-primary-500/20">
+          <Link href="/contacts" className="btn btn-secondary text-xs self-start sm:self-auto">
             + Adicionar Contatos
           </Link>
         </div>
@@ -394,31 +394,29 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           const estimatedMinutes = Math.ceil(queued * 1.5); // ~90s por email na média
 
           return (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Na Fila</p>
-                <p className="text-xl sm:text-2xl font-black text-amber-400 mt-1">{queued}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-5">
+              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400">Na Fila</p>
+                <p className="text-2xl font-black text-amber-400 mt-1 tabular-nums">{queued}</p>
                 {queued > 0 && (
-                  <p className="text-[9px] text-surface-500 mt-0.5">
-                    ≈ {estimatedMinutes < 60 ? `${estimatedMinutes} min` : `${Math.ceil(estimatedMinutes / 60)}h`}
-                  </p>
+                  <p className="text-[9px] text-surface-500 mt-0.5">≈ {estimatedMinutes < 60 ? `${estimatedMinutes}min` : `${Math.ceil(estimatedMinutes / 60)}h`}</p>
                 )}
               </div>
-              <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Enviando</p>
-                <p className="text-xl sm:text-2xl font-black text-blue-400 mt-1">{sending}</p>
+              <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-400">Enviando</p>
+                <p className="text-2xl font-black text-blue-400 mt-1 tabular-nums">{sending}</p>
               </div>
-              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Enviados</p>
-                <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-1">{sent}</p>
+              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400">Enviados</p>
+                <p className="text-2xl font-black text-emerald-400 mt-1 tabular-nums">{sent}</p>
               </div>
-              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Falha</p>
-                <p className="text-xl sm:text-2xl font-black text-red-400 mt-1">{failed}</p>
+              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/15">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-400">Falha</p>
+                <p className="text-2xl font-black text-red-400 mt-1 tabular-nums">{failed}</p>
               </div>
-              <div className="p-3 rounded-xl bg-surface-800/50 border border-surface-800 col-span-2 lg:col-span-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-surface-400">Total</p>
-                <p className="text-xl sm:text-2xl font-black text-surface-200 mt-1">{contacts.length}</p>
+              <div className="p-3 rounded-xl bg-surface-800/30 border border-surface-800/40 col-span-2 lg:col-span-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-surface-400">Total</p>
+                <p className="text-2xl font-black text-surface-200 mt-1 tabular-nums">{contacts.length}</p>
               </div>
             </div>
           );
@@ -441,15 +439,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         <div className="mobile-table-wrapper">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-surface-800 text-[10px] font-bold uppercase tracking-widest text-surface-500">
-                <th className="pb-3">Contato</th>
-                <th className="pb-3">Etapa Atual</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3">Provedor</th>
-                <th className="pb-3">Enviado em</th>
+              <tr className="border-b border-surface-800/40 text-[10px] font-bold uppercase tracking-[0.15em] text-surface-600">
+                <th className="pb-3 px-1">Contato</th>
+                <th className="pb-3 px-1">Etapa</th>
+                <th className="pb-3 px-1">Status</th>
+                <th className="pb-3 px-1 hidden sm:table-cell">Provedor</th>
+                <th className="pb-3 px-1 hidden sm:table-cell">Enviado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-800/50 text-surface-300">
+            <tbody className="divide-y divide-surface-800/30 text-surface-300">
               {contacts.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center">
@@ -480,33 +478,33 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   const status = statusConfig[cc.stepStatus] || statusConfig['PENDING'];
                   
                   return (
-                    <tr key={cc.id} className="group hover:bg-surface-900/30 transition-colors">
-                      <td className="py-3">
-                        <Link href={`/contacts/${cc.contact?.id}`} className="font-medium text-primary-400 hover:underline">
-                          {cc.contact?.email || "Email Indisponível"}
+                    <tr key={cc.id} className="group hover:bg-surface-800/20 transition-colors">
+                      <td className="py-2.5 px-1">
+                        <Link href={`/contacts/${cc.contact?.id}`} className="text-sm font-semibold text-primary-400 hover:text-primary-300 transition-colors">
+                          {cc.contact?.email || "—"}
                         </Link>
-                        {cc.contact?.name && <p className="text-xs text-surface-500">{cc.contact.name}</p>}
+                        {cc.contact?.name && <p className="text-[10px] text-surface-500">{cc.contact.name}</p>}
                       </td>
-                      <td className="py-3">
+                      <td className="py-2.5 px-1">
                         {cc.currentStep ? (
-                          <span className="text-xs font-medium">Email {cc.currentStep.stepOrder}</span>
-                        ) : <span className="text-xs text-surface-500">—</span>}
+                          <span className="text-xs font-medium">#{cc.currentStep.stepOrder}</span>
+                        ) : <span className="text-xs text-surface-600">—</span>}
                       </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 rounded-full ${status.color} ${status.pulse ? 'animate-pulse' : ''}`} />
-                          <span className="text-xs font-bold">{status.label}</span>
+                      <td className="py-2.5 px-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${status.color} ${status.pulse ? 'animate-dot-pulse' : ''}`} />
+                          <span className="text-xs font-semibold">{status.label}</span>
                         </div>
                       </td>
-                      <td className="py-3">
-                        <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">
+                      <td className="py-2.5 px-1 hidden sm:table-cell">
+                        <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">
                           {cc.contact?.provider || "—"}
                         </span>
                       </td>
-                      <td className="py-3 text-xs text-surface-500">
+                      <td className="py-2.5 px-1 text-[11px] text-surface-500 hidden sm:table-cell">
                         {cc.lastSentAt ? formatDate(cc.lastSentAt) : (
                           cc.stepStatus === 'QUEUED' ? (
-                            <span className="text-amber-400/70 text-[10px]">Aguardando warmup...</span>
+                            <span className="text-amber-400/70 text-[10px]">Warmup...</span>
                           ) : "—"
                         )}
                       </td>

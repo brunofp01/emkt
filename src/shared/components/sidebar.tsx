@@ -1,6 +1,5 @@
 /**
- * Sidebar — Navegação principal do dashboard.
- * Server Component que renderiza a sidebar fixa com links de navegação.
+ * Sidebar — Premium navigation with animated active indicator.
  */
 "use client";
 
@@ -11,13 +10,11 @@ import {
   Users,
   Mail,
   BarChart3,
-  Settings,
-  Zap,
   ChevronLeft,
   ChevronRight,
   Server,
+  Zap,
 } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/shared/lib/utils";
 
 const navItems = [
@@ -42,107 +39,134 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside
-      className={cn(
-        "fixed inset-y-0 left-0 z-[60] flex flex-col border-r border-surface-800/60 bg-surface-950/98 backdrop-blur-2xl transition-all duration-300 ease-in-out shadow-2xl lg:shadow-none",
-        // Mobile behavior: Slide in/out
-        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        // Desktop behavior: Collapse/Expand
-        collapsed ? "lg:w-[72px]" : "lg:w-[260px]",
-        "w-[280px] lg:w-[260px]" // Default width for mobile and expanded desktop
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[59] bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
       )}
-    >
-      {/* Logo & Close (Mobile) */}
-      <div className="flex h-16 items-center justify-between border-b border-surface-800/60 px-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 shadow-lg shadow-primary-500/20">
-            <Zap className="h-5 w-5 text-white" />
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-[60] flex flex-col border-r border-surface-800/40 bg-surface-950/98 backdrop-blur-2xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          collapsed ? "lg:w-[72px]" : "lg:w-[260px]",
+          "w-[280px]"
+        )}
+      >
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-3 border-b border-surface-800/40 px-4">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 via-primary-600 to-accent-600 shadow-lg shadow-primary-500/25">
+            <Zap className="h-4.5 w-4.5 text-white" />
           </div>
           <div className={cn(
             "overflow-hidden transition-all duration-300",
             collapsed ? "lg:w-0 lg:opacity-0" : "w-auto opacity-100"
           )}>
-            <h1 className="text-base font-bold tracking-tight text-surface-50">
+            <h1 className="text-sm font-extrabold tracking-tight text-surface-50">
               MailPulse
             </h1>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-surface-500">
-              Email Marketing
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-surface-500">
+              Email Engine
             </p>
+          </div>
+
+          {/* Mobile close */}
+          <button 
+            onClick={onClose}
+            className="ml-auto lg:hidden p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800/60 transition-all"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+          {navItems.map((item) => {
+            const isActive =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-primary-500/10 text-primary-400"
+                    : "text-surface-400 hover:bg-surface-800/50 hover:text-surface-200 hover:translate-x-0.5"
+                )}
+              >
+                {/* Active indicator bar */}
+                {isActive && (
+                  <div className="absolute -left-3 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                )}
+                
+                <Icon
+                  className={cn(
+                    "h-[18px] w-[18px] flex-shrink-0 transition-all duration-200",
+                    isActive
+                      ? "text-primary-400"
+                      : "text-surface-500 group-hover:text-surface-300"
+                  )}
+                />
+                <span className={cn(
+                  "truncate transition-all duration-300",
+                  collapsed ? "lg:opacity-0 lg:w-0 lg:hidden" : "opacity-100 w-auto"
+                )}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Profile area */}
+        <div className={cn(
+          "border-t border-surface-800/40 p-3 transition-all duration-300",
+          collapsed ? "lg:px-2" : ""
+        )}>
+          <div className={cn(
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 bg-surface-900/40 border border-surface-800/30",
+            collapsed ? "lg:justify-center lg:px-0" : ""
+          )}>
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500/20 to-accent-500/20 text-xs font-bold text-primary-400 border border-primary-500/20">
+              MP
+            </div>
+            <div className={cn(
+              "min-w-0 overflow-hidden transition-all duration-300",
+              collapsed ? "lg:w-0 lg:opacity-0 lg:hidden" : "w-auto opacity-100"
+            )}>
+              <p className="text-xs font-semibold text-surface-200 truncate">MailPulse Admin</p>
+              <p className="text-[10px] text-surface-500 truncate">admin@mailpulse.com</p>
+            </div>
           </div>
         </div>
 
-        {/* Botão fechar no Mobile */}
-        <button 
-          onClick={onClose}
-          className="lg:hidden p-1 text-surface-400 hover:text-surface-100"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose} // Fecha no mobile ao clicar
-              className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                isActive
-                  ? "bg-primary-500/10 text-primary-400 shadow-sm shadow-primary-500/5"
-                  : "text-surface-400 hover:bg-surface-800/60 hover:text-surface-200"
-              )}
-            >
-              <Icon
-                className={cn(
-                  "h-5 w-5 flex-shrink-0 transition-colors",
-                  isActive
-                    ? "text-primary-400"
-                    : "text-surface-500 group-hover:text-surface-300"
-                )}
-              />
-              <span className={cn(
-                "truncate transition-all duration-300",
-                collapsed ? "lg:opacity-0 lg:w-0" : "opacity-100 w-auto"
-              )}>
-                {item.label}
-              </span>
-              {isActive && (
-                <div className={cn(
-                  "ml-auto h-1.5 w-1.5 rounded-full bg-primary-400 shadow-sm shadow-primary-400/50",
-                  collapsed && "lg:hidden"
-                )} />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Collapse toggle (Desktop only) */}
-      <div className="hidden lg:block border-t border-surface-800/60 p-3">
-        <button
-          onClick={onToggleCollapse}
-          className="flex w-full items-center justify-center rounded-lg px-3 py-2 text-surface-500 transition-colors hover:bg-surface-800/60 hover:text-surface-300"
-          aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
-        >
-          {collapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
-            <>
-              <ChevronLeft className="h-5 w-5" />
-              <span className="ml-2 text-sm">Recolher</span>
-            </>
-          )}
-        </button>
-      </div>
-    </aside>
+        {/* Collapse toggle (Desktop only) */}
+        <div className="hidden lg:block border-t border-surface-800/40 p-2">
+          <button
+            onClick={onToggleCollapse}
+            className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-surface-500 transition-all duration-200 hover:bg-surface-800/50 hover:text-surface-300"
+            aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <>
+                <ChevronLeft className="h-4 w-4" />
+                <span className="text-xs font-medium">Recolher</span>
+              </>
+            )}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

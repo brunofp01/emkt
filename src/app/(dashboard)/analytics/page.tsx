@@ -10,35 +10,32 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-surface-50 tracking-tight">Analytics Global</h1>
-          <p className="mt-1 text-xs sm:text-sm text-surface-500">Inteligência consolidada e análise de performance profunda.</p>
-        </div>
-        <div className="hidden sm:flex p-2 rounded-lg bg-surface-900 border border-surface-800">
-          <PieChart className="h-6 w-6 text-primary-500" />
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-surface-50 tracking-tight">Analytics Global</h1>
+        <p className="mt-1 text-sm text-surface-500">Inteligência consolidada e análise de performance.</p>
       </div>
 
-      {/* Grid de KPIs Secundários */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs */}
+      <div className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
         {[
-          { label: "Base de Contatos", value: stats.totalContacts, icon: Users, color: "text-indigo-400" },
-          { label: "Cliques Totais", value: stats.totalClicked, icon: TrendingUp, color: "text-cyan-400" },
-          { label: "Bounces (Erros)", value: stats.totalBounced, icon: Info, color: "text-amber-400" },
-          { label: "CTR (Click Rate)", value: `${stats.clickRate}%`, icon: BarChart3, color: "text-violet-400" },
+          { label: "Base de Contatos", value: stats.totalContacts, icon: Users, gradient: "from-indigo-500 to-violet-600" },
+          { label: "Cliques Totais", value: stats.totalClicked, icon: TrendingUp, gradient: "from-cyan-500 to-blue-600" },
+          { label: "Bounces", value: stats.totalBounced, icon: Info, gradient: "from-amber-500 to-orange-600" },
+          { label: "CTR", value: `${stats.clickRate}%`, icon: BarChart3, gradient: "from-violet-500 to-purple-600" },
         ].map((kpi) => (
-          <div key={kpi.label} className="glass-card p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-surface-500">{kpi.label}</h3>
+          <div key={kpi.label} className="glass-card !p-5 relative overflow-hidden group">
+            <div className={`absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r ${kpi.gradient} opacity-40 group-hover:opacity-80 transition-opacity`} />
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className={`p-1.5 rounded-lg bg-gradient-to-br ${kpi.gradient}`}>
+                <kpi.icon className="h-3.5 w-3.5 text-white" />
+              </div>
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500">{kpi.label}</h3>
             </div>
-            <p className="text-3xl font-black text-surface-50">{kpi.value.toLocaleString('pt-BR')}</p>
+            <p className="text-3xl font-black text-surface-50 tabular-nums tracking-tight">{typeof kpi.value === 'number' ? kpi.value.toLocaleString('pt-BR') : kpi.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Visualizações de Gráficos (Reutilizando componentes premium) */}
       <DashboardCharts 
         funnelData={stats.funnelData} 
         trendData={stats.trendData} 
@@ -47,28 +44,27 @@ export default async function AnalyticsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Distribuição por Provedor */}
-        <div className="glass-card p-6">
-          <h2 className="mb-6 text-sm font-bold uppercase tracking-widest text-surface-400">Eficiência por Provedor</h2>
-          <div className="space-y-5">
-            {stats.providerCounts.map((p) => {
+        {/* Provider efficiency */}
+        <div className="glass-card !p-6">
+          <h2 className="mb-5 text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500">Eficiência por Provedor</h2>
+          <div className="space-y-4">
+            {stats.providerCounts.map((p, i) => {
               const percentage = calcPercentage(p.count, stats.totalContacts);
-              const providerColor = "#3b82f6";
+              const colors = ["#6366f1", "#06b6d4", "#8b5cf6", "#10b981", "#f59e0b"];
+              const color = colors[i % colors.length];
               return (
-                <div key={p.provider} className="group">
-                  <div className="mb-2 flex items-center justify-between text-xs">
-                    <span className="font-bold text-surface-300">
-                      {p.provider}
-                    </span>
-                    <span className="text-surface-500 font-mono">{p.count} ({percentage}%)</span>
+                <div key={p.provider}>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-surface-300">{p.provider}</span>
+                    <span className="text-surface-500 font-mono tabular-nums text-[10px]">{p.count} ({percentage}%)</span>
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-900 border border-surface-800/50">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-surface-900 border border-surface-800/30">
                     <div 
-                      className="h-full rounded-full transition-all duration-1000" 
+                      className="h-full rounded-full transition-all duration-700" 
                       style={{ 
-                        width: `${percentage}%`, 
-                        backgroundColor: providerColor,
-                        boxShadow: `0 0 8px ${providerColor}30`
+                        width: `${Math.max(percentage, 2)}%`, 
+                        backgroundColor: color,
+                        boxShadow: `0 0 8px ${color}30`
                       }} 
                     />
                   </div>
@@ -78,21 +74,21 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Campanhas e Status */}
-        <div className="glass-card p-6">
-          <h2 className="mb-6 text-sm font-bold uppercase tracking-widest text-surface-400">Campanhas em Monitoramento</h2>
-          <div className="space-y-3">
+        {/* Campaign monitoring */}
+        <div className="glass-card !p-6">
+          <h2 className="mb-5 text-[11px] font-bold uppercase tracking-[0.15em] text-surface-500">Campanhas em Monitoramento</h2>
+          <div className="space-y-2">
             {stats.campaignsPerformance.map((campaign) => (
-              <div key={campaign.id} className="flex items-center justify-between p-4 rounded-xl bg-surface-900/30 border border-surface-800/50">
-                <div className="flex items-center gap-3">
-                  <div className={`h-2 w-2 rounded-full ${campaign.status === 'ACTIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-surface-600'}`} />
-                  <span className="text-sm font-bold text-surface-200">{campaign.name}</span>
+              <div key={campaign.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-900/30 border border-surface-800/30">
+                <div className="flex items-center gap-2.5">
+                  <div className={`h-2 w-2 rounded-full ${campaign.status === 'ACTIVE' ? 'bg-emerald-500 animate-dot-pulse' : 'bg-surface-600'}`} />
+                  <span className="text-xs font-semibold text-surface-200">{campaign.name}</span>
                 </div>
-                <span className="text-[10px] font-bold text-surface-500 uppercase tracking-widest">{campaign.status}</span>
+                <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-widest">{campaign.status}</span>
               </div>
             ))}
             {stats.campaignsPerformance.length === 0 && (
-              <p className="text-center py-10 text-xs text-surface-600 uppercase tracking-widest italic">Nenhuma campanha encontrada</p>
+              <p className="text-center py-10 text-xs text-surface-600 italic">Nenhuma campanha</p>
             )}
           </div>
         </div>
