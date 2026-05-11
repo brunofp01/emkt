@@ -9,7 +9,6 @@ import { CAMPAIGN_STATUS_LABELS, STEP_STATUS_LABELS } from "@/shared/lib/constan
 import { StatusBadge } from "@/shared/components/status-badge";
 import { formatDate } from "@/shared/lib/utils";
 import { activateCampaign, pauseCampaign } from "@/features/campaigns/actions/create-campaign";
-import { fetchAll } from "@/shared/lib/supabase-utils";
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -17,93 +16,43 @@ interface CampaignDetailPageProps {
 
 /**
  * Calcula métricas de envio/entrega/abertura por etapa da campanha.
- * Usa diretamente o campo stepStatus do CampaignContact (não depende de webhooks/EmailEvent).
+ * Usa SQL COUNT em vez de baixar todos os registros — performance instantânea.
  */
 async function getStepMetrics(campaignId: string, steps: any[], totalContacts: number) {
   if (totalContacts === 0 || steps.length === 0) return [];
 
-  // Buscar todos os CampaignContacts com seus status e etapa atual
-  const contacts = await fetchAll<any>(
-    supabaseAdmin
-      .from('CampaignContact')
-      .select('contactId, currentStepId, stepStatus, abVariant')
-      .eq('campaignId', campaignId)
-  );
-
-  if (!contacts || contacts.length === 0) {
-    return steps.map((step: any) => ({
-      stepId: step.id,
-      stepOrder: step.stepOrder,
-      subject: step.subject,
-      subjectB: step.subjectB,
-      isABTest: step.isABTest,
-      delayHours: step.delayHours,
-      total: totalContacts,
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-      variantA: { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 },
-      variantB: { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 },
-    }));
-  }
-
-  // Hierarquia de status: um contato com status DELIVERED também passou por SENT
   const statusHierarchy: Record<string, number> = {
-    'QUEUED': 0,
-    'SENDING': 1,
-    'SENT': 2,
-    'DELIVERED': 3,
-    'OPENED': 4,
-    'CLICKED': 5,
-    'BOUNCED': -1,
-    'FAILED': -1,
+    'QUEUED': 0, 'SENDING': 1, 'SENT': 2, 'DELIVERED': 3, 'OPENED': 4, 'CLICKED': 5,
+    'BOUNCED': -1, 'FAILED': -1,
   };
 
-  const isSent = (status: string) => (statusHierarchy[status] ?? 0) >= 2;
-  const isDelivered = (status: string) => (statusHierarchy[status] ?? 0) >= 3;
-  const isOpened = (status: string) => (statusHierarchy[status] ?? 0) >= 4;
-  const isClicked = (status: string) => (statusHierarchy[status] ?? 0) >= 5;
-
-  // Ordenar etapas por stepOrder para determinar a progressão
   const sortedSteps = [...steps].sort((a: any, b: any) => a.stepOrder - b.stepOrder);
 
-  return sortedSteps.map((step: any) => {
-    let variantA = { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
-    let variantB = { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
-
-    // Para cada etapa, analisamos os contatos que estão NAQUELA etapa ou já passaram por ela
-    // Na etapa 1, todos os contatos participam
-    // Nas etapas seguintes, apenas os que alcançaram aquela etapa
-    const isFirstStep = step.stepOrder === 1;
-
-    contacts.forEach((c: any) => {
-      // Encontrar a stepOrder da etapa atual do contato
-      const contactCurrentStep = sortedSteps.find((s: any) => s.id === c.currentStepId);
-      const contactStepOrder = contactCurrentStep?.stepOrder ?? 1;
-
-      // O contato participa dessa etapa se: está nela OU já passou por ela
-      const participates = isFirstStep || contactStepOrder >= step.stepOrder;
-      if (!participates) return;
-
-      const isB = c.abVariant === 'B';
-      const target = isB ? variantB : variantA;
-      target.total += 1;
-
-      // Se o contato está em uma etapa POSTERIOR, ele já completou esta etapa
-      if (contactStepOrder > step.stepOrder) {
-        target.sent += 1;
-        target.delivered += 1;
-        target.opened += 1; // Se avançou, é porque abriu
-        target.clicked += 1;
-      } else if (contactStepOrder === step.stepOrder) {
-        // Está nesta etapa - usar o stepStatus atual
-        if (isSent(c.stepStatus)) target.sent += 1;
-        if (isDelivered(c.stepStatus)) target.delivered += 1;
-        if (isOpened(c.stepStatus)) target.opened += 1;
-        if (isClicked(c.stepStatus)) target.clicked += 1;
-      }
-    });
+  // Para cada etapa, buscar contagens dos contatos naquela etapa via COUNT
+  const metricsPromises = sortedSteps.map(async (step: any) => {
+    // Buscar contatos que estão NESTA etapa especificamente
+    const [
+      { count: stepTotal },
+      { count: stepSent },
+      { count: stepDelivered },
+      { count: stepOpened },
+      { count: stepClicked },
+    ] = await Promise.all([
+      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true })
+        .eq('campaignId', campaignId).eq('currentStepId', step.id),
+      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true })
+        .eq('campaignId', campaignId).eq('currentStepId', step.id)
+        .in('stepStatus', ['SENT', 'DELIVERED', 'OPENED', 'CLICKED']),
+      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true })
+        .eq('campaignId', campaignId).eq('currentStepId', step.id)
+        .in('stepStatus', ['DELIVERED', 'OPENED', 'CLICKED']),
+      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true })
+        .eq('campaignId', campaignId).eq('currentStepId', step.id)
+        .in('stepStatus', ['OPENED', 'CLICKED']),
+      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true })
+        .eq('campaignId', campaignId).eq('currentStepId', step.id)
+        .eq('stepStatus', 'CLICKED'),
+    ]);
 
     return {
       stepId: step.id,
@@ -113,15 +62,18 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
       isABTest: step.isABTest,
       delayHours: step.delayHours,
       total: totalContacts,
-      sent: variantA.sent + variantB.sent,
-      delivered: variantA.delivered + variantB.delivered,
-      opened: variantA.opened + variantB.opened,
-      clicked: variantA.clicked + variantB.clicked,
-      variantA,
-      variantB,
+      sent: stepSent || 0,
+      delivered: stepDelivered || 0,
+      opened: stepOpened || 0,
+      clicked: stepClicked || 0,
+      variantA: { sent: stepSent || 0, delivered: stepDelivered || 0, opened: stepOpened || 0, clicked: stepClicked || 0, total: stepTotal || 0 },
+      variantB: { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 },
     };
   });
+
+  return Promise.all(metricsPromises);
 }
+
 
 export default async function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const { id } = await params;
