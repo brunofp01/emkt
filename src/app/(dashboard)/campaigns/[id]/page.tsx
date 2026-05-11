@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Play, Pause, RotateCcw, Users, Mail, BarChart3, Clock, Send, CheckCircle2, Eye, MousePointerClick } from "lucide-react";
+import { ArrowLeft, Play, Pause, RotateCcw, Users, Mail, BarChart3, Clock, Send, CheckCircle2, Eye, MousePointerClick, Edit2 } from "lucide-react";
 import { getCampaignById } from "@/features/campaigns/lib/queries";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { CAMPAIGN_STATUS_LABELS, STEP_STATUS_LABELS } from "@/shared/lib/constants";
@@ -171,6 +171,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               )}
               <Link href={`/campaigns/${campaign.id}/analytics`} className="btn btn-secondary text-xs flex-1 sm:flex-none">
                 <BarChart3 className="h-3.5 w-3.5" /> Analytics
+              </Link>
+              <Link href={`/campaigns/${campaign.id}/edit`} className="btn btn-primary !bg-surface-800 !text-surface-100 hover:!bg-surface-700 !border-surface-700 text-xs flex-1 sm:flex-none">
+                <Edit2 className="h-3.5 w-3.5" /> Editar
               </Link>
             </div>
           </div>

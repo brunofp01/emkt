@@ -24,19 +24,23 @@ export function EmailCodeEditor({ initialHtml, subject, onSave, onCancel }: Emai
 
   // Atualiza o preview no iframe
   useEffect(() => {
-    if (iframeRef.current) {
+    if (iframeRef.current && typeof html === "string") {
       let previewHtml = html;
       // Substituir variáveis para o preview
-      Object.entries(mockData).forEach(([key, value]) => {
-        const regex = new RegExp(`{{${key}}}`, "g");
-        previewHtml = previewHtml.replace(regex, value);
-      });
+      try {
+        Object.entries(mockData).forEach(([key, value]) => {
+          const regex = new RegExp(`{{${key}}}`, "g");
+          previewHtml = previewHtml.replace(regex, value);
+        });
 
-      const doc = iframeRef.current.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(previewHtml);
-        doc.close();
+        const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
+        if (doc) {
+          doc.open();
+          doc.write(previewHtml);
+          doc.close();
+        }
+      } catch (err) {
+        console.error("Erro ao processar preview do email:", err);
       }
     }
   }, [html]);

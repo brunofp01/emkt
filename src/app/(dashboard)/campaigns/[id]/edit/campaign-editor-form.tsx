@@ -24,19 +24,19 @@ interface StepData {
 
 export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const router = useRouter();
-  const [steps, setSteps] = useState<StepData[]>(campaign.steps.map((s: any) => ({
+  const [steps, setSteps] = useState<StepData[]>((campaign.steps || []).map((s: any) => ({
     id: s.id,
     stepOrder: s.stepOrder,
-    subject: s.subject,
-    htmlBody: s.htmlBody,
+    subject: s.subject || "",
+    htmlBody: s.htmlBody || "",
     textBody: s.textBody || "",
-    design: s.design,
-    conditions: s.conditions,
-    delayHours: s.delayHours,
-    isABTest: s.isABTest,
+    design: s.design || null,
+    conditions: s.conditions || null,
+    delayHours: s.delayHours || 0,
+    isABTest: !!s.isABTest,
     subjectB: s.subjectB || "",
     htmlBodyB: s.htmlBodyB || "",
-    designB: s.designB,
+    designB: s.designB || null,
   })));
 
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -115,12 +115,12 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const inputClass = "input-base h-10";
   const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500";
 
-  if (editingStepIndex !== null) {
+  if (editingStepIndex !== null && steps[editingStepIndex]) {
     const currentStep = steps[editingStepIndex];
     return (
-      <div className="fixed inset-0 z-50 bg-surface-950 p-4 md:p-8 animate-in fade-in zoom-in duration-300">
+      <div className="fixed inset-0 z-[100] bg-surface-950 p-4 md:p-8 animate-in fade-in zoom-in duration-300 pointer-events-auto">
         <EmailCodeEditor
-          initialHtml={editingVariant === "A" ? currentStep.htmlBody : currentStep.htmlBodyB}
+          initialHtml={editingVariant === "A" ? (currentStep.htmlBody || "") : (currentStep.htmlBodyB || "")}
           subject={editingVariant === "A" ? currentStep.subject : currentStep.subjectB}
           onSave={handleSaveDesign}
           onCancel={() => setEditingStepIndex(null)}
