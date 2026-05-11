@@ -8,12 +8,14 @@ import { PlatformImporter } from "./platform-importer";
 interface ImportModalProps {
   campaigns: Array<{ id: string; name: string }>;
   onClose: () => void;
+  defaultMethod?: ImportMethod;
+  initialCampaignId?: string;
 }
 
 type ImportMethod = "selection" | "csv" | "platforms";
 
-export function ImportModal({ onClose, campaigns }: ImportModalProps) {
-  const [method, setMethod] = useState<ImportMethod>("selection");
+export function ImportModal({ onClose, campaigns, defaultMethod = "selection", initialCampaignId }: ImportModalProps) {
+  const [method, setMethod] = useState<ImportMethod>(defaultMethod);
 
   const renderSelection = () => (
     <div className="space-y-4 py-4">
@@ -84,7 +86,14 @@ export function ImportModal({ onClose, campaigns }: ImportModalProps) {
         {/* Content */}
         <div className="p-6">
           {method === "selection" && renderSelection()}
-          {method === "csv" && <CSVImporter campaigns={campaigns} onCancel={() => setMethod("selection")} onSuccess={onClose} />}
+          {method === "csv" && (
+            <CSVImporter 
+              campaigns={campaigns} 
+              onCancel={() => setMethod("selection")} 
+              onSuccess={onClose} 
+              initialCampaignId={initialCampaignId}
+            />
+          )}
           {method === "platforms" && <PlatformImporter />}
         </div>
       </div>

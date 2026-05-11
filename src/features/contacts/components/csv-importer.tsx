@@ -2,13 +2,14 @@
 
 import { useState, useRef } from "react";
 import Papa from "papaparse";
-import { Upload, FileText, Check, AlertCircle, Loader2, Table, ChevronRight, Tags, Activity } from "lucide-react";
+import { Upload, FileText, Check, AlertCircle, Loader2, Table, ChevronRight, Tags, Activity, Mail, Users as UsersIcon } from "lucide-react";
 import { bulkImportContacts } from "../actions/bulk-import";
 
 interface CSVImporterProps {
   campaigns: Array<{ id: string; name: string }>;
   onCancel: () => void;
   onSuccess: () => void;
+  initialCampaignId?: string;
 }
 
 interface Mapping {
@@ -16,12 +17,12 @@ interface Mapping {
   name: string;
   company: string;
   phone: string;
-    tags: string;
-  }
-  
-  export function CSVImporter({ onCancel, onSuccess, campaigns }: CSVImporterProps) {
-    const [file, setFile] = useState<File | null>(null);
-    const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  tags: string;
+}
+
+export function CSVImporter({ onCancel, onSuccess, campaigns, initialCampaignId }: CSVImporterProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>(initialCampaignId || "");
     const [headers, setHeaders] = useState<string[]>([]);
   const [preview, setPreview] = useState<any[]>([]);
   const [mapping, setMapping] = useState<Mapping>({
@@ -117,20 +118,35 @@ interface Mapping {
 
   if (step === "upload") {
     return (
-      <div className="flex flex-col items-center justify-center border-2 border-dashed border-surface-800 rounded-3xl p-12 transition-colors hover:border-primary-500/30">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-500/10 text-primary-500 mb-6">
+      <div 
+        className="group flex flex-col items-center justify-center border-2 border-dashed border-surface-800 rounded-3xl p-12 transition-all hover:border-primary-500/50 hover:bg-primary-500/5 cursor-pointer relative overflow-hidden"
+        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-primary-500/50', 'bg-primary-500/5'); }}
+        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-primary-500/50', 'bg-primary-500/5'); }}
+        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) processFile(f); }}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-500 mb-6 group-hover:scale-110 transition-transform duration-500">
           <Upload className="h-10 w-10" />
         </div>
-        <h3 className="text-xl font-bold text-surface-50 mb-2">Arraste seu CSV aqui</h3>
+        
+        <h3 className="text-xl font-bold text-surface-50 mb-2">Solte seu arquivo aqui</h3>
         <p className="text-surface-500 text-sm mb-8 text-center max-w-xs">
-          O arquivo deve conter pelo menos uma coluna com os emails dos contatos.
+          Suporta arquivos .csv exportados do <span className="text-surface-300 font-semibold">Google Sheets</span> ou <span className="text-surface-300 font-semibold">Excel</span>.
         </p>
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded-xl bg-primary-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-500 transition-all"
-        >
-          Selecionar Arquivo
-        </button>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex -space-x-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-8 w-8 rounded-full border-2 border-surface-950 bg-surface-900 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-surface-500" />
+              </div>
+            ))}
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-surface-600">Arraste ou clique</span>
+        </div>
+        
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -155,17 +171,24 @@ interface Mapping {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <h4 className="text-xs font-black uppercase tracking-widest text-surface-500">Mapeamento de Colunas</h4>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {Object.keys(mapping).map((field) => (
-                <div key={field} className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-surface-500 flex items-center gap-2">
-                    {field === "email" && <span className="text-red-500">*</span>}
-                    {field}
+                <div key={field} className="group space-y-1.5 p-3 rounded-xl border border-surface-800/40 bg-surface-900/30 transition-all hover:border-primary-500/30">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500 flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      {field === "email" && <Mail className="h-3 w-3 text-primary-400" />}
+                      {field === "name" && <UsersIcon className="h-3 w-3 text-primary-400" />}
+                      {field === "company" && <Table className="h-3 w-3 text-primary-400" />}
+                      {field === "phone" && <Activity className="h-3 w-3 text-primary-400" />}
+                      {field === "tags" && <Tags className="h-3 w-3 text-primary-400" />}
+                      {field}
+                    </span>
+                    {field === "email" && <span className="text-[9px] text-red-500 font-black">OBRIGATÓRIO</span>}
                   </label>
                   <select 
                     value={(mapping as any)[field]}
                     onChange={(e) => setMapping({ ...mapping, [field]: e.target.value })}
-                    className={selectClass}
+                    className="h-9 w-full rounded-lg border border-surface-800 bg-surface-950 px-3 text-xs text-surface-200 focus:border-primary-500/50 focus:outline-none transition-colors"
                   >
                     <option value="">Não importar</option>
                     {headers.map(h => <option key={h} value={h}>{h}</option>)}

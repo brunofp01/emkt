@@ -2,9 +2,10 @@
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { updateCampaign, type CampaignActionState, getAvailableTags } from "@/features/campaigns/actions/create-campaign";
-import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info, Target, Users as UsersIcon, Tag, Clock, ArrowDown, ChevronUp, ChevronDown, Zap, Save, X } from "lucide-react";
+import { Plus, Trash2, Mail, Loader2, ArrowLeft, Layout, CheckCircle2, Split, Info, Target, Users as UsersIcon, Tag, Clock, ArrowDown, ChevronUp, ChevronDown, Zap, Save, X, FileUp } from "lucide-react";
 import Link from "next/link";
 import { EmailCodeEditor } from "@/features/campaigns/components/email-code-editor";
+import { ImportModal } from "@/features/contacts/components/import-modal";
 
 interface StepData {
   id?: string;
@@ -41,6 +42,7 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [audienceType, setAudienceType] = useState<"NONE" | "ALL" | "TAGS">(campaign.audienceType || "NONE");
   const [selectedTags, setSelectedTags] = useState<string[]>(campaign.audienceTags || []);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
   const [editingVariant, setEditingVariant] = useState<"A" | "B">("A");
@@ -129,6 +131,14 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-fade-in pb-28">
+      {showImportModal && (
+        <ImportModal
+          campaigns={[campaign]}
+          initialCampaignId={campaign.id}
+          defaultMethod="csv"
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
       <Link href={`/campaigns/${campaign.id}`} className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300 transition-colors">
         <ArrowLeft className="h-4 w-4" /> Cancelar Edição
       </Link>
@@ -223,6 +233,20 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
                   <span className={`text-xs font-bold ${audienceType === 'TAGS' ? 'text-surface-50' : 'text-surface-400'}`}>Atualizar por Tags</span>
                 </div>
                 <p className="text-[10px] text-surface-500 leading-relaxed">Filtra novos contatos baseados nas tags e os inclui na campanha.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="p-4 rounded-xl border border-dashed border-surface-800 bg-surface-900/30 text-left transition-all hover:border-primary-500/50 hover:bg-surface-800/20 group"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1.5 rounded-lg bg-surface-800 text-surface-500 group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                    <FileUp className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-bold text-surface-400 group-hover:text-surface-50">Importar Novos</span>
+                </div>
+                <p className="text-[10px] text-surface-500 leading-relaxed">Sobe uma planilha fria e vincula os contatos imediatamente a esta régua.</p>
               </button>
             </div>
 

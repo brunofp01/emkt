@@ -186,15 +186,33 @@ export function ContactTable({ contacts, total, page, totalPages, campaigns, act
             </div>
           </div>
 
-          <div className="relative w-full lg:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-surface-600" />
-            <input 
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-base w-full pl-9 !py-2 text-xs"
-            />
+          <div className="flex items-center gap-3 w-full lg:max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-surface-600" />
+              <input 
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-base w-full pl-9 !py-2 text-xs"
+              />
+            </div>
+            
+            <button 
+              onClick={() => setShowImport(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-surface-900 border border-surface-800 px-4 py-2 text-xs font-bold text-surface-300 hover:bg-surface-800 hover:text-white transition-all"
+            >
+              <FileUp className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Importar</span>
+            </button>
+
+            <button 
+              onClick={() => setShowForm(true)}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-primary-500/20 hover:bg-primary-400 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Novo</span>
+            </button>
           </div>
         </div>
 
