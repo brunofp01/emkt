@@ -155,10 +155,7 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 export async function getAvailableTags() {
   const data = await fetchAll<any>(supabase.from('Contact').select('tags'));
 
-  if (error) {
-    console.error('Erro ao buscar tags:', error);
-    return [];
-  }
+  if (!data) return [];
 
   const allTags = new Set<string>();
   data.forEach(item => {
@@ -192,7 +189,7 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
         .in('stepStatus', ['QUEUED', 'PENDING'])
     );
 
-    if (contactsError) throw contactsError;
+  if (!contacts) return { success: true };
 
     // 3. Buscar a primeira etapa da campanha
     const { data: steps } = await supabase
