@@ -112,7 +112,8 @@ export async function getContactById(id: string) {
 export async function getContactCountsByProvider() {
   const { data, error } = await supabase
     .from('Contact')
-    .select('provider');
+    .select('provider')
+    .range(0, 9999);
 
   if (error) {
     console.error('Erro ao contar contatos por provedor:', error);
@@ -136,7 +137,8 @@ export async function getContactCountsByProvider() {
 export async function getAvailableTags() {
   const { data, error } = await supabase
     .from('Contact')
-    .select('tags');
+    .select('tags')
+    .range(0, 9999);
 
   if (error) {
     console.error('Erro ao buscar tags:', error);

@@ -128,7 +128,7 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
         // Sem filtro extra, pega todos os contatos
       }
 
-      const { data: contactsToLink } = await contactQuery;
+      const { data: contactsToLink } = await contactQuery.range(0, 9999);
 
       if (contactsToLink && contactsToLink.length > 0) {
         const contactIds = contactsToLink.map(c => c.id);
@@ -154,7 +154,8 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
 export async function getAvailableTags() {
   const { data, error } = await supabase
     .from('Contact')
-    .select('tags');
+    .select('tags')
+    .range(0, 9999);
 
   if (error) {
     console.error('Erro ao buscar tags:', error);
@@ -189,7 +190,8 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
       .from('CampaignContact')
       .select('id, contactId, currentStepId, contact:Contact(email)')
       .eq('campaignId', campaignId)
-      .in('stepStatus', ['QUEUED', 'PENDING']);
+      .in('stepStatus', ['QUEUED', 'PENDING'])
+      .range(0, 9999);
 
     if (contactsError) throw contactsError;
 
@@ -409,7 +411,7 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
         contactQuery = contactQuery.contains('tags', validated.audienceTags);
       }
 
-      const { data: contactsToLink } = await contactQuery;
+      const { data: contactsToLink } = await contactQuery.range(0, 9999);
 
       if (contactsToLink && contactsToLink.length > 0) {
         const contactIds = contactsToLink.map(c => c.id);
