@@ -10,7 +10,7 @@ export async function getCampaigns() {
     .select(`
       *,
       steps:CampaignStep(id, stepOrder, subject),
-      campaignContacts:CampaignContact(limit=10000,count)
+      campaignContacts:CampaignContact(count)
     `)
     .order('createdAt', { ascending: false });
 
@@ -32,20 +32,29 @@ export async function getCampaignById(id: string) {
     .from('Campaign')
     .select(`
       *,
-      steps:CampaignStep(*),
-      campaignContacts:CampaignContact(limit=10000,
-        *,
-        contact:Contact(id, email, name, provider, status),
-        currentStep:CampaignStep(stepOrder, subject)
-      )
+      steps:CampaignStep(*)
     `)
     .eq('id', id)
     .single();
 
-  if (error) {
+  if (error || !data) {
     console.error(`Erro ao buscar campanha ${id}:`, error);
     return null;
   }
+
+  // Buscar contatos da campanha separadamente para evitar o limite de 1000 e erros de tipos
+  const { data: campaignContacts } = await supabase
+    .from('CampaignContact')
+    .select(`
+      *,
+      contact:Contact(id, email, name, provider, status),
+      currentStep:CampaignStep(stepOrder, subject)
+    `)
+    .eq('campaignId', id)
+    .range(0, 9999);
+
+  data.campaignContacts = campaignContacts || [];
+
 
   if (data?.steps) {
     data.steps.sort((a: any, b: any) => a.stepOrder - b.stepOrder);
