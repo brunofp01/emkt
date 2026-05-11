@@ -87,53 +87,20 @@ export async function selectProviderForSend(): Promise<{
   }
 
   if (available.length === 0) {
-    // Nenhum provedor com capacidade — usar o que tem mais sobra
-    console.warn("[ProviderSelector] Todos os provedores atingiram o limite diário. Usando fallback.");
+    // Nenhum provedor com capacidade — usar o primeiro como fallback
+    console.warn("[ProviderSelector] Todos os provedores atingiram o limite diário.");
     const fallback = configs[0];
     return { providerId: fallback.provider, providerConfig: fallback };
   }
 
-  // Para uma única conta disponível, retornar direto
-  if (available.length === 1) {
-    return { providerId: available[0].provider, providerConfig: available[0] };
-  }
-
-  // Calcular peso ponderado (weight configurado × score de reputação)
-  const weighted = available.map(c => ({
-    config: c,
-    provider: c.provider,
-    score: calculateReputationScore(c),
-    weight: c.weight || 25,
-    effectiveWeight: 0,
-  }));
-
-  // Peso efetivo = weight × (score/100)
-  weighted.forEach(w => {
-    w.effectiveWeight = w.weight * (w.score / 100);
-  });
-
-  const totalWeight = weighted.reduce((sum, w) => sum + w.effectiveWeight, 0);
-
-  if (totalWeight === 0) {
-    // Fallback: round-robin simples
-    const idx = Math.floor(Math.random() * available.length);
-    return { providerId: available[idx].provider, providerConfig: available[idx] };
-  }
-
-  // Seleção aleatória ponderada
-  const random = Math.random() * totalWeight;
-  let cumulative = 0;
-  for (const w of weighted) {
-    cumulative += w.effectiveWeight;
-    if (random <= cumulative) {
-      console.log(`[ProviderSelector] Roleta: ${w.provider} (score: ${w.score}, weight: ${w.effectiveWeight.toFixed(1)})`);
-      return { providerId: w.provider, providerConfig: w.config };
-    }
-  }
-
-  // Fallback improvável
-  const last = weighted[weighted.length - 1];
-  return { providerId: last.provider, providerConfig: last.config };
+  // Seleção EQUALITÁRIA (1 por 1): 
+  // Escolhemos aleatoriamente entre todos os que têm capacidade.
+  // Isso garante que, estatisticamente, todos enviem o mesmo volume.
+  const idx = Math.floor(Math.random() * available.length);
+  const selected = available[idx];
+  
+  console.log(`[ProviderSelector] Seleção Igualitária: ${selected.provider} (${available.length} disponíveis)`);
+  return { providerId: selected.provider, providerConfig: selected };
 }
 
 /**
