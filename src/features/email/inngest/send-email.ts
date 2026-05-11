@@ -157,9 +157,11 @@ export const sendEmail = inngest.createFunction(
 
     logger.info(`[Roleta] Email para ${contact.email} → Provedor: ${providerId}`);
 
+    /*
     // 4. DELAY DE WARMUP — Espaçar envios para parecer comportamento humano
     const delaySec = getSendDelay(accountTier as AccountTier);
     await step.sleep("warmup-send-delay", `${delaySec}s`);
+    */
 
     // 5. Buscar step config para A/B testing
     const stepConfig = await step.run("fetch-step-config", async () => {
