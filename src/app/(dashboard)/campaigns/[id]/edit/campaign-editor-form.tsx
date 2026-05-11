@@ -115,19 +115,12 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
   const inputClass = "input-base h-10";
   const labelClass = "mb-1.5 block text-[10px] font-bold uppercase tracking-[0.15em] text-surface-500";
 
-  if (editingStepIndex !== null && steps[editingStepIndex]) {
-    const currentStep = steps[editingStepIndex];
-    return (
-      <div className="fixed inset-0 z-[100] bg-surface-950 p-4 md:p-8 animate-in fade-in zoom-in duration-300 pointer-events-auto">
-        <EmailCodeEditor
-          initialHtml={editingVariant === "A" ? (currentStep.htmlBody || "") : (currentStep.htmlBodyB || "")}
-          subject={editingVariant === "A" ? currentStep.subject : currentStep.subjectB}
-          onSave={handleSaveDesign}
-          onCancel={() => setEditingStepIndex(null)}
-        />
-      </div>
-    );
-  }
+  // Logs de depuração
+  useEffect(() => {
+    if (editingStepIndex !== null) {
+      console.log("[Editor] Abrindo editor para etapa:", editingStepIndex, "Variante:", editingVariant);
+    }
+  }, [editingStepIndex, editingVariant]);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 animate-fade-in pb-28">
@@ -403,6 +396,21 @@ export default function CampaignEditorForm({ campaign }: { campaign: any }) {
           </button>
         </div>
       </form>
+
+      {/* Editor Modal / Overlay */}
+      {editingStepIndex !== null && steps[editingStepIndex] && (
+        <div className="fixed inset-0 z-[100] bg-surface-950 p-4 md:p-8 overflow-hidden flex flex-col pointer-events-auto">
+          <EmailCodeEditor
+            initialHtml={editingVariant === "A" ? (steps[editingStepIndex].htmlBody || "") : (steps[editingStepIndex].htmlBodyB || "")}
+            subject={editingVariant === "A" ? steps[editingStepIndex].subject : steps[editingStepIndex].subjectB}
+            onSave={handleSaveDesign}
+            onCancel={() => {
+              console.log("[Editor] Cancelando edição");
+              setEditingStepIndex(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

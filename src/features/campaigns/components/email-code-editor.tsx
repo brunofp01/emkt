@@ -22,28 +22,22 @@ export function EmailCodeEditor({ initialHtml, subject, onSave, onCancel }: Emai
     contactCompany: "Empresa XPTO",
   };
 
-  // Atualiza o preview no iframe
-  useEffect(() => {
-    if (iframeRef.current && typeof html === "string") {
-      let previewHtml = html;
-      // Substituir variáveis para o preview
-      try {
-        Object.entries(mockData).forEach(([key, value]) => {
-          const regex = new RegExp(`{{${key}}}`, "g");
-          previewHtml = previewHtml.replace(regex, value);
-        });
-
-        const doc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-        if (doc) {
-          doc.open();
-          doc.write(previewHtml);
-          doc.close();
-        }
-      } catch (err) {
-        console.error("Erro ao processar preview do email:", err);
-      }
+  // Prepara o HTML para o preview (substituindo variáveis)
+  const getPreviewHtml = () => {
+    if (typeof html !== "string") return "";
+    let preview = html;
+    try {
+      Object.entries(mockData).forEach(([key, value]) => {
+        const regex = new RegExp(`{{${key}}}`, "g");
+        preview = preview.replace(regex, value);
+      });
+    } catch (err) {
+      console.error("Erro ao processar variáveis do email:", err);
     }
-  }, [html]);
+    return preview;
+  };
+
+  const previewHtml = getPreviewHtml();
 
   const viewWidths = {
     desktop: "100%",
@@ -140,7 +134,7 @@ export function EmailCodeEditor({ initialHtml, subject, onSave, onCancel }: Emai
               style={{ width: viewMode === 'desktop' ? '100%' : viewWidths[viewMode] }}
             >
               <iframe
-                ref={iframeRef}
+                srcDoc={previewHtml}
                 title="Email Preview"
                 className="w-full h-full border-none min-h-[500px]"
               />
