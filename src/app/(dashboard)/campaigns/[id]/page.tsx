@@ -25,7 +25,7 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
   const { data: contacts } = await supabaseAdmin
     .from('CampaignContact')
     .select('contactId, currentStepId, stepStatus, abVariant')
-    .eq('campaignId', campaignId);
+    .eq('campaignId', campaignId).range(0, 9999);
 
   if (!contacts || contacts.length === 0) {
     return steps.map((step: any) => ({
