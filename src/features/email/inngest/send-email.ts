@@ -237,6 +237,10 @@ export const sendEmail = inngest.createFunction(
 
     if (!result.success) {
       const isBlocked = (result as any).accountBlocked;
+      const isPermanentFailure = result.error?.toLowerCase().includes('bounce') || 
+                                 result.error?.toLowerCase().includes('rejected') ||
+                                 result.error?.toLowerCase().includes('denied') ||
+                                 result.error?.toLowerCase().includes('not found');
       
       if (isBlocked) {
         await step.run("deactivate-blocked-account", async () => {
@@ -249,10 +253,12 @@ export const sendEmail = inngest.createFunction(
         });
       }
 
-      // Registrar bounce (step separado para não duplicar no retry)
-      await step.run("record-bounce", async () => {
-        await recordSendResult(providerId, "bounced");
-      });
+      // Registrar bounce APENAS se for erro real de entrega
+      if (isPermanentFailure) {
+        await step.run("record-bounce", async () => {
+          await recordSendResult(providerId, "bounced");
+        });
+      }
       
       logger.error(`Falha no envio via ${providerId}`, result.error, { contactId, campaignContactId });
       throw new Error(`Falha no envio via ${providerId}: ${result.error}`);
