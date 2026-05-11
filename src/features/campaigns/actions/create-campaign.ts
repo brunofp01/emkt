@@ -160,7 +160,7 @@ export async function getAvailableTags() {
   const allTags = new Set<string>();
   data.forEach(item => {
     if (Array.isArray(item.tags)) {
-      item.tags.forEach(tag => allTags.add(tag));
+      item.tags.forEach((tag: string) => allTags.add(tag));
     }
   });
 
@@ -210,7 +210,7 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
         const batch = contacts.slice(i, i + BATCH_SIZE);
         
         // Enviar todos do lote em paralelo
-        await Promise.all(batch.map(async (cc) => {
+        await Promise.all(batch.map(async (cc: any) => {
           await inngest.send({
             name: "email/send",
             data: {

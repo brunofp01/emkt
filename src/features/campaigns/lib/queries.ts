@@ -78,11 +78,11 @@ export async function getCampaignAnalytics(campaignId: string) {
     return { statusCounts: {}, eventCounts: {}, totalContacts: 0 };
   }
 
-  const contactIds = campaignContacts.map(c => c.contactId);
+  const contactIds = campaignContacts.map((c: any) => c.contactId);
 
   // 2. Calcular status counts
   const statusCounts: Record<string, number> = {};
-  for (const c of campaignContacts) {
+  for (const c of campaignContacts as any[]) {
     statusCounts[c.stepStatus] = (statusCounts[c.stepStatus] ?? 0) + 1;
   }
 
@@ -97,7 +97,7 @@ export async function getCampaignAnalytics(campaignId: string) {
     );
 
     if (events) {
-      for (const e of events) {
+      for (const e of events as any[]) {
         eventCounts[e.eventType] = (eventCounts[e.eventType] ?? 0) + 1;
       }
     }

@@ -77,7 +77,7 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
     // Nas etapas seguintes, apenas os que alcançaram aquela etapa
     const isFirstStep = step.stepOrder === 1;
 
-    contacts.forEach(c => {
+    contacts.forEach((c: any) => {
       // Encontrar a stepOrder da etapa atual do contato
       const contactCurrentStep = sortedSteps.find((s: any) => s.id === c.currentStepId);
       const contactStepOrder = contactCurrentStep?.stepOrder ?? 1;
