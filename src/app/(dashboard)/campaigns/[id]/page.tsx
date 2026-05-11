@@ -130,8 +130,36 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   if (!campaign) notFound();
 
   const steps = campaign.steps || [];
-  const contacts = campaign.campaignContacts || [];
-  const stepMetrics = await getStepMetrics(id, steps, contacts.length);
+  
+  // 1. Buscar contadores ultra-rápidos (sem baixar os dados)
+  const [
+    { count: totalCount },
+    { count: queuedCount },
+    { count: sendingCount },
+    { count: sentCount },
+    { count: failedCount }
+  ] = await Promise.all([
+    supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', id),
+    supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', id).in('stepStatus', ['QUEUED', 'PENDING']),
+    supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', id).eq('stepStatus', 'SENDING'),
+    supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', id).in('stepStatus', ['SENT', 'DELIVERED', 'OPENED', 'CLICKED']),
+    supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', id).in('stepStatus', ['BOUNCED', 'FAILED']),
+  ]);
+
+  // 2. Buscar apenas os 50 contatos mais recentes para a tabela (Paginação visual)
+  const { data: recentContacts } = await supabaseAdmin
+    .from('CampaignContact')
+    .select(`
+      *,
+      contact:Contact(id, email, name, provider, status),
+      currentStep:CampaignStep(stepOrder, subject)
+    `)
+    .eq('campaignId', id)
+    .order('updatedAt', { ascending: false })
+    .limit(50);
+
+  // 3. Métricas das etapas (ainda usa fetchAll para precisão nos gráficos, mas limitado a campos leves)
+  const stepMetrics = await getStepMetrics(id, steps, totalCount || 0);
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -147,7 +175,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             {campaign.description && <p className="mt-1 text-sm text-surface-500">{campaign.description}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-surface-500">
               <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {steps.length} etapas</span>
-              <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {contacts.length} contatos</span>
+              <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {totalCount} contatos</span>
               <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {formatDate(campaign.createdAt)}</span>
             </div>
           </div>
@@ -387,46 +415,34 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         </div>
 
         {/* Cards de Status da Fila */}
-        {contacts.length > 0 && (() => {
-          const queued = contacts.filter((c: any) => c.stepStatus === 'QUEUED' || c.stepStatus === 'PENDING').length;
-          const sending = contacts.filter((c: any) => c.stepStatus === 'SENDING').length;
-          const sent = contacts.filter((c: any) => ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(c.stepStatus)).length;
-          const failed = contacts.filter((c: any) => ['BOUNCED', 'FAILED'].includes(c.stepStatus)).length;
-          
-          // Tempo estimado: contas NOVA = ~90s/email, AQUECIDA = ~60s, VETERANA = ~30s
-          const estimatedMinutes = Math.ceil(queued * 1.5); // ~90s por email na média
-
-          return (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-5">
-              <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400">Na Fila</p>
-                <p className="text-2xl font-black text-amber-400 mt-1 tabular-nums">{queued}</p>
-                {queued > 0 && (
-                  <p className="text-[9px] text-surface-500 mt-0.5">≈ {estimatedMinutes < 60 ? `${estimatedMinutes}min` : `${Math.ceil(estimatedMinutes / 60)}h`}</p>
-                )}
-              </div>
-              <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-400">Enviando</p>
-                <p className="text-2xl font-black text-blue-400 mt-1 tabular-nums">{sending}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400">Enviados</p>
-                <p className="text-2xl font-black text-emerald-400 mt-1 tabular-nums">{sent}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/15">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-400">Falha</p>
-                <p className="text-2xl font-black text-red-400 mt-1 tabular-nums">{failed}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-surface-800/30 border border-surface-800/40 col-span-2 lg:col-span-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-surface-400">Total</p>
-                <p className="text-2xl font-black text-surface-200 mt-1 tabular-nums">{contacts.length}</p>
-              </div>
-            </div>
-          );
-        })()}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-5">
+          <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400">Na Fila</p>
+            <p className="text-2xl font-black text-amber-400 mt-1 tabular-nums">{queuedCount}</p>
+            {(queuedCount || 0) > 0 && (
+              <p className="text-[9px] text-surface-500 mt-0.5">≈ {Math.ceil((queuedCount || 0) * 1.5) < 60 ? `${Math.ceil((queuedCount || 0) * 1.5)}min` : `${Math.ceil((queuedCount || 0) * 1.5 / 60)}h`}</p>
+            )}
+          </div>
+          <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-400">Enviando</p>
+            <p className="text-2xl font-black text-blue-400 mt-1 tabular-nums">{sendingCount}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-400">Enviados</p>
+            <p className="text-2xl font-black text-emerald-400 mt-1 tabular-nums">{sentCount}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/15">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-400">Falha</p>
+            <p className="text-2xl font-black text-red-400 mt-1 tabular-nums">{failedCount}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-surface-800/30 border border-surface-800/40 col-span-2 lg:col-span-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-surface-400">Total</p>
+            <p className="text-2xl font-black text-surface-200 mt-1 tabular-nums">{totalCount}</p>
+          </div>
+        </div>
 
         {/* Info do Warmup */}
-        {contacts.some((c: any) => c.stepStatus === 'QUEUED' || c.stepStatus === 'PENDING') && (
+        {(queuedCount || 0) > 0 && (
           <div className="mb-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3">
             <Clock className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
             <div>
@@ -451,7 +467,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800/30 text-surface-300">
-              {contacts.length === 0 ? (
+              {!recentContacts || recentContacts.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
@@ -466,7 +482,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   </td>
                 </tr>
               ) : (
-                contacts.map((cc: any) => {
+                recentContacts.map((cc: any) => {
                   const statusConfig: Record<string, { color: string; label: string; pulse: boolean }> = {
                     'PENDING': { color: 'bg-surface-500', label: 'Pendente', pulse: false },
                     'QUEUED': { color: 'bg-amber-500', label: 'Na Fila', pulse: true },
