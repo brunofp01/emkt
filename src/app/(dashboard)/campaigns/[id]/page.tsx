@@ -9,6 +9,7 @@ import { CAMPAIGN_STATUS_LABELS, STEP_STATUS_LABELS } from "@/shared/lib/constan
 import { StatusBadge } from "@/shared/components/status-badge";
 import { formatDate } from "@/shared/lib/utils";
 import { activateCampaign, pauseCampaign } from "@/features/campaigns/actions/create-campaign";
+import { fetchAll } from "@/shared/lib/supabase-utils";
 
 interface CampaignDetailPageProps {
   params: Promise<{ id: string }>;
@@ -22,10 +23,12 @@ async function getStepMetrics(campaignId: string, steps: any[], totalContacts: n
   if (totalContacts === 0 || steps.length === 0) return [];
 
   // Buscar todos os CampaignContacts com seus status e etapa atual
-  const { data: contacts } = await supabaseAdmin
-    .from('CampaignContact')
-    .select('contactId, currentStepId, stepStatus, abVariant')
-    .eq('campaignId', campaignId).range(0, 9999);
+  const contacts = await fetchAll<any>(
+    supabaseAdmin
+      .from('CampaignContact')
+      .select('contactId, currentStepId, stepStatus, abVariant')
+      .eq('campaignId', campaignId)
+  );
 
   if (!contacts || contacts.length === 0) {
     return steps.map((step: any) => ({

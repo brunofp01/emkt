@@ -3,6 +3,7 @@
  * Refatorado para máxima estabilidade via HTTPS.
  */
 import { supabase } from "@/shared/lib/supabase";
+import { fetchAll } from "@/shared/lib/supabase-utils";
 
 export async function getCampaigns() {
   const { data: campaigns, error } = await supabase
@@ -43,15 +44,16 @@ export async function getCampaignById(id: string) {
   }
 
   // Buscar contatos da campanha separadamente para evitar o limite de 1000 e erros de tipos
-  const { data: campaignContacts } = await supabase
-    .from('CampaignContact')
-    .select(`
-      *,
-      contact:Contact(id, email, name, provider, status),
-      currentStep:CampaignStep(stepOrder, subject)
-    `)
-    .eq('campaignId', id)
-    .range(0, 9999);
+  const campaignContacts = await fetchAll<any>(
+    supabase
+      .from('CampaignContact')
+      .select(`
+        *,
+        contact:Contact(id, email, name, provider, status),
+        currentStep:CampaignStep(stepOrder, subject)
+      `)
+      .eq('campaignId', id)
+  );
 
   data.campaignContacts = campaignContacts || [];
 
@@ -65,13 +67,14 @@ export async function getCampaignById(id: string) {
 
 export async function getCampaignAnalytics(campaignId: string) {
   // 1. Buscar IDs dos contatos nesta campanha
-  const { data: campaignContacts, error: ccError } = await supabase
-    .from('CampaignContact')
-    .select('contactId, stepStatus')
-    .eq('campaignId', campaignId).range(0, 9999);
+  const campaignContacts = await fetchAll<any>(
+    supabase
+      .from('CampaignContact')
+      .select('contactId, stepStatus')
+      .eq('campaignId', campaignId)
+  );
 
-  if (ccError || !campaignContacts) {
-    console.error('Erro ao buscar contacts da campanha:', ccError);
+  if (!campaignContacts || campaignContacts.length === 0) {
     return { statusCounts: {}, eventCounts: {}, totalContacts: 0 };
   }
 
@@ -86,12 +89,14 @@ export async function getCampaignAnalytics(campaignId: string) {
   // 3. Buscar eventos apenas dos contatos desta campanha
   const eventCounts: Record<string, number> = {};
   if (contactIds.length > 0) {
-    const { data: events, error: eventError } = await supabase
-      .from('EmailEvent')
-      .select('eventType')
-      .in('contactId', contactIds).range(0, 9999);
+    const events = await fetchAll<any>(
+      supabase
+        .from('EmailEvent')
+        .select('eventType')
+        .in('contactId', contactIds)
+    );
 
-    if (!eventError && events) {
+    if (events) {
       for (const e of events) {
         eventCounts[e.eventType] = (eventCounts[e.eventType] ?? 0) + 1;
       }

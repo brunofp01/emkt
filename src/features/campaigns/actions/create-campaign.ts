@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supabaseAdmin as supabase } from "@/shared/lib/supabase"; // Usando o cliente Admin para estabilidade total
 import { inngest } from "@/shared/lib/inngest";
+import { fetchAll } from "@/shared/lib/supabase-utils";
 
 // Função simples para gerar um ID compatível com o campo String do Prisma
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -128,7 +129,7 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
         // Sem filtro extra, pega todos os contatos
       }
 
-      const { data: contactsToLink } = await contactQuery.range(0, 9999);
+      const contactsToLink = await fetchAll<any>(contactQuery);
 
       if (contactsToLink && contactsToLink.length > 0) {
         const contactIds = contactsToLink.map(c => c.id);
@@ -152,10 +153,7 @@ export async function createCampaign(_prevState: CampaignActionState, formData: 
  * Exportado como Server Action para uso no formulário de criação.
  */
 export async function getAvailableTags() {
-  const { data, error } = await supabase
-    .from('Contact')
-    .select('tags')
-    .range(0, 9999);
+  const data = await fetchAll<any>(supabase.from('Contact').select('tags'));
 
   if (error) {
     console.error('Erro ao buscar tags:', error);
@@ -186,12 +184,13 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
     if (updateError) throw updateError;
 
     // 2. Buscar todos os contatos que estão aguardando (QUEUED ou PENDING)
-    const { data: contacts, error: contactsError } = await supabase
-      .from('CampaignContact')
-      .select('id, contactId, currentStepId, contact:Contact(email)')
-      .eq('campaignId', campaignId)
-      .in('stepStatus', ['QUEUED', 'PENDING'])
-      .range(0, 9999);
+    const contacts = await fetchAll<any>(
+      supabase
+        .from('CampaignContact')
+        .select('id, contactId, currentStepId, contact:Contact(email)')
+        .eq('campaignId', campaignId)
+        .in('stepStatus', ['QUEUED', 'PENDING'])
+    );
 
     if (contactsError) throw contactsError;
 
@@ -411,7 +410,7 @@ export async function updateCampaign(campaignId: string, _prevState: CampaignAct
         contactQuery = contactQuery.contains('tags', validated.audienceTags);
       }
 
-      const { data: contactsToLink } = await contactQuery.range(0, 9999);
+      const contactsToLink = await fetchAll<any>(contactQuery);
 
       if (contactsToLink && contactsToLink.length > 0) {
         const contactIds = contactsToLink.map(c => c.id);
