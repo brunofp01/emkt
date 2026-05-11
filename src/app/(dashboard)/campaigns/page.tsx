@@ -48,7 +48,7 @@ export default async function CampaignsPage() {
                 <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[10px] text-surface-500">
                   <StatusBadge status={campaign.status} label={CAMPAIGN_STATUS_LABELS[campaign.status as keyof typeof CAMPAIGN_STATUS_LABELS] ?? campaign.status} size="sm" dot />
                   <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{campaign.steps.length} etapas</span>
-                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{campaign._count.campaignContacts} contatos</span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{campaign._count.sent} / {campaign._count.campaignContacts} enviados</span>
                 </div>
                 <p className="mt-3 text-[10px] text-surface-600">{formatDate(campaign.createdAt)}</p>
               </Link>

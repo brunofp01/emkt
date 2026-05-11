@@ -1,28 +1,29 @@
-import { supabase } from "@/shared/lib/supabase";
-import { supabaseAdmin } from "@/shared/lib/supabase";
+import { supabase, supabaseAdmin } from "@/shared/lib/supabase";
+import { fetchAll } from "@/shared/lib/supabase-utils";
 
 /**
  * Dashboard Statistics Query - Usa CampaignContact.stepStatus como fonte primária
  * para o funil (não depende de webhooks).
  */
 export async function getDashboardStats() {
-  // 1. Coleta de dados em paralelo
+  // 1. Coleta de dados básicos e contadores rápidos
   const [
     { count: totalContacts },
     { count: activeCampaigns },
-    { data: events },
-    { data: providers },
     { data: recentEventsData },
     { data: campaignsData },
-    { data: campaignContacts }
   ] = await Promise.all([
     supabase.from('Contact').select('*', { count: 'exact', head: true }),
     supabase.from('Campaign').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
-    supabase.from('EmailEvent').select('eventType, timestamp'),
-    supabase.from('Contact').select('provider'),
     supabase.from('EmailEvent').select('*, contact:Contact(*)').order('timestamp', { ascending: false }).limit(10),
     supabase.from('Campaign').select('id, name, status'),
-    supabaseAdmin.from('CampaignContact').select('stepStatus, campaignId')
+  ]);
+
+  // 2. Coleta de dados pesados usando fetchAll para bypass de limite
+  const [events, providers, campaignContacts] = await Promise.all([
+    fetchAll<any>(supabase.from('EmailEvent').select('eventType, timestamp')),
+    fetchAll<any>(supabase.from('Contact').select('provider')),
+    fetchAll<any>(supabaseAdmin.from('CampaignContact').select('stepStatus, campaignId'))
   ]);
 
   // 2. Funil de Performance REAL baseado em CampaignContact.stepStatus

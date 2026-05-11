@@ -6,26 +6,41 @@ import { supabase } from "@/shared/lib/supabase";
 import { fetchAll } from "@/shared/lib/supabase-utils";
 
 export async function getCampaigns() {
+  // 1. Buscar todas as campanhas
   const { data: campaigns, error } = await supabase
     .from('Campaign')
     .select(`
       *,
-      steps:CampaignStep(id, stepOrder, subject),
-      campaignContacts:CampaignContact(count)
+      steps:CampaignStep(id, stepOrder, subject)
     `)
     .order('createdAt', { ascending: false });
 
-  if (error) {
+  if (error || !campaigns) {
     console.error('Erro ao buscar campanhas:', error);
     return [];
   }
 
-  return (campaigns || []).map(campaign => ({
-    ...campaign,
-    _count: {
-      campaignContacts: campaign.campaignContacts?.[0]?.count || 0
-    }
-  }));
+  // 2. Buscar todos os contatos vinculados a campanhas para calcular métricas reais
+  // Usamos fetchAll para garantir que pegamos todos (bypassing o limite de 1000)
+  const allCampaignContacts = await fetchAll<any>(
+    supabase.from('CampaignContact').select('campaignId, stepStatus')
+  );
+
+  // 3. Mapear métricas para cada campanha
+  return campaigns.map(campaign => {
+    const myContacts = allCampaignContacts.filter((cc: any) => cc.campaignId === campaign.id);
+    const sentCount = myContacts.filter((cc: any) => 
+      ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(cc.stepStatus)
+    ).length;
+
+    return {
+      ...campaign,
+      _count: {
+        campaignContacts: myContacts.length,
+        sent: sentCount
+      }
+    };
+  });
 }
 
 export async function getCampaignById(id: string) {
