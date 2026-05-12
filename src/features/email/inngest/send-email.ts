@@ -125,6 +125,8 @@ export const sendEmail = inngest.createFunction(
     let finalProviderId: string | null = null;
     let finalProviderConfig: any = null;
     let finalMessageId: string | null = null;
+    let finalAccountTier: any = null;
+    let finalDelaySec: number | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const providerResult = await step.run(`select-and-validate-provider-v2-${attempt}`, async () => {
@@ -193,6 +195,8 @@ export const sendEmail = inngest.createFunction(
         finalProviderId = providerId;
         finalProviderConfig = providerConfig;
         finalMessageId = result.messageId || null;
+        finalAccountTier = accountTier;
+        finalDelaySec = delaySec;
         break; // Entregue com sucesso! Interrompe o loop.
       }
 
@@ -247,21 +251,21 @@ export const sendEmail = inngest.createFunction(
     await step.run("record-events", async () => {
       const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const now = new Date().toISOString();
-      const isSMTP = providerConfig?.providerType === 'SMTP';
+      const isSMTP = finalProviderConfig?.providerType === 'SMTP';
       
       const promises: PromiseLike<any>[] = [
         // Registrar evento SENT
         supabaseAdmin.from('EmailEvent').insert({
           id: generateId(),
-          externalId: result.messageId || `sent_${campaignContactId}_${Date.now()}`,
+          externalId: finalMessageId || `sent_${campaignContactId}_${Date.now()}`,
           contactId: contact.id,
-          messageId: result.messageId || 'direct-send',
-          provider: providerId,
+          messageId: finalMessageId || 'direct-send',
+          provider: finalProviderId,
           eventType: "SENT",
           timestamp: now,
         }),
         // Registrar envio no warmup
-        recordSendResult(providerId, "sent"),
+        recordSendResult(finalProviderId!, "sent"),
       ];
 
       // Para SMTP, registrar também DELIVERED
@@ -271,8 +275,8 @@ export const sendEmail = inngest.createFunction(
             id: generateId(),
             externalId: `delivered_${campaignContactId}_${Date.now()}`,
             contactId: contact.id,
-            messageId: result.messageId || 'direct-send',
-            provider: providerId,
+            messageId: finalMessageId || 'direct-send',
+            provider: finalProviderId,
             eventType: "DELIVERED",
             timestamp: now,
           })
@@ -286,15 +290,15 @@ export const sendEmail = inngest.createFunction(
     // Separado dos outros steps para que retries não dupliquem a contagem
     await step.run("increment-provider-counter", async () => {
       const { incrementProviderSendCount } = await import("@/features/email/lib/provider-selector");
-      await incrementProviderSendCount(providerId);
+      await incrementProviderSendCount(finalProviderId!);
     });
 
     return { 
       success: true, 
-      messageId: result.messageId, 
-      provider: providerId,
-      accountTier,
-      delaySec
+      messageId: finalMessageId, 
+      provider: finalProviderId,
+      accountTier: finalAccountTier,
+      delaySec: finalDelaySec
     };
   }
 );
