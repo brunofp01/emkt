@@ -131,10 +131,11 @@ export const sendEmail = inngest.createFunction(
         const currentSent = freshConfig?.sentToday || 0;
         
         if (currentSent >= effectiveLimit) {
-          logger.info(`[WarmupThrottle] ${providerId} (${accountTier}): ${currentSent}/${effectiveLimit} — tentando outro provedor`);
-          // Lançar erro para que Inngest faça retry — ESTE step não é memoizado então
-          // o retry vai chamar selectProviderForSend() novamente (pode pegar outro provedor)
-          throw new Error(`Provider ${providerId} at daily limit (${currentSent}/${effectiveLimit}). Retrying with another.`);
+          logger.info(`[WarmupThrottle] ${providerId} (${accountTier}): ${currentSent}/${effectiveLimit} — atingiu limite, Inngest irá pausar.`);
+          
+          // NÃO lance erro (que esgota retries e falha o evento). 
+          // Retorne um sinal especial para que o fluxo principal possa dormir até amanhã!
+          return { ok: false, reason: "limit_reached", providerId, providerConfig, accountTier };
         }
       }
 
@@ -148,6 +149,19 @@ export const sendEmail = inngest.createFunction(
     });
 
     if (!providerResult.ok) {
+      if ((providerResult as any).reason === "limit_reached") {
+         // O limite diário de todos os provedores ou do selecionado esgotou.
+         // Vamos dormir até a meia-noite do dia seguinte!
+         const now = new Date();
+         const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0); // 00:05 am amanhã
+         
+         await step.sleepUntil("wait-for-daily-reset", tomorrow);
+         
+         // Lançamos erro controlável para que o Inngest tente novamente do zero amanhã.
+         // O retry count será incrementado, mas podemos aumentar os retries globais se necessário.
+         // Ou melhor ainda, simplesmente falhamos este step para o Retry pegar AMANHÃ!
+         throw new Error("Limites diários esgotados. Dormiu até meia-noite e agora vai tentar de novo.");
+      }
       return { skipped: true, reason: `Account issue: ${(providerResult as any).reason}` };
     }
 
