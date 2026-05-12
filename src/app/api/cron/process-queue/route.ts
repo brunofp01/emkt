@@ -131,9 +131,9 @@ export async function GET(req: Request) {
     if (sentCount > 0) {
       // Como a RPC incrementa 1, se enviamos múltiplos, chamamos o correspondente.
       // Ou melhor, usamos um update direto na tabela ProviderConfig via admin
-      const { data: config } = await supabaseAdmin.from('ProviderConfig').select('dailySent').eq('provider', providerId).single();
+      const { data: config } = await supabaseAdmin.from('ProviderConfig').select('sentToday').eq('provider', providerId).single();
       if (config) {
-         await supabaseAdmin.from('ProviderConfig').update({ dailySent: (config.dailySent || 0) + sentCount }).eq('provider', providerId);
+         await supabaseAdmin.from('ProviderConfig').update({ sentToday: (config.sentToday || 0) + sentCount }).eq('provider', providerId);
       }
     }
 
