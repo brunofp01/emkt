@@ -30,6 +30,9 @@ export const sendEmail = inngest.createFunction(
     id: "send-email",
     name: "Send Email via Provider Rotation",
     retries: 3,
+    concurrency: {
+      limit: 10, // Processa no máximo 10 envios simultâneos para evitar sobrecarga no banco e rate limits
+    },
     triggers: [{ event: "email/send" }],
   },
   async ({ event, step }) => {

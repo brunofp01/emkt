@@ -209,24 +209,25 @@ export async function activateCampaign(campaignId: string): Promise<CampaignActi
       for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
         const batch = contacts.slice(i, i + BATCH_SIZE);
         
-        // Enviar todos do lote em paralelo
-        await Promise.all(batch.map(async (cc: any) => {
-          await inngest.send({
-            name: "email/send",
-            data: {
-              contactId: cc.contactId,
-              campaignContactId: cc.id,
-              subject: firstStep.subject,
-              htmlBody: firstStep.htmlBody,
-              textBody: firstStep.textBody,
-            },
-          });
-
-          await supabase
-            .from('CampaignContact')
-            .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
-            .eq('id', cc.id);
+        // Disparo em lote para o Inngest (1 requisição HTTP)
+        const inngestEvents = batch.map((cc: any) => ({
+          name: "email/send" as const,
+          data: {
+            contactId: cc.contactId,
+            campaignContactId: cc.id,
+            subject: firstStep.subject,
+            htmlBody: firstStep.htmlBody,
+            textBody: firstStep.textBody,
+          },
         }));
+        await inngest.send(inngestEvents);
+
+        // Atualização em lote para o Supabase (1 requisição HTTP)
+        const batchIds = batch.map((cc: any) => cc.id);
+        await supabase
+          .from('CampaignContact')
+          .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
+          .in('id', batchIds);
       }
     }
 
