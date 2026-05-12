@@ -80,7 +80,7 @@ export async function getDashboardStats() {
   const timelineMap: Record<string, any> = {};
   if (recentEvents) {
     recentEvents.forEach((e: any) => {
-      const date = new Date(e.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const date = new Date(e.timestamp).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
       if (!timelineMap[date]) {
         timelineMap[date] = { date, sent: 0, opened: 0, clicked: 0, bounced: 0 };
       }
@@ -100,7 +100,7 @@ export async function getDashboardStats() {
 
   if (recentContacts) {
     recentContacts.forEach((c: any) => {
-      const date = new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const date = new Date(c.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
       growthMap[date] = (growthMap[date] || 0) + 1;
     });
   }

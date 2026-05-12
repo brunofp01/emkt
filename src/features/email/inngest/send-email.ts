@@ -258,13 +258,15 @@ export const sendEmail = inngest.createFunction(
                                  result.error?.toLowerCase().includes('not found');
       
       if (isBlocked) {
-        await step.run("deactivate-blocked-account", async () => {
+        await step.run("pause-blocked-account", async () => {
+          // Em vez de desativar permanentemente, "esgotamos" o limite de hoje
+          // para que a conta durma até meia-noite e ressuscite automaticamente amanhã.
           await supabaseAdmin
             .from('ProviderConfig')
-            .update({ isActive: false, updatedAt: new Date().toISOString() })
+            .update({ sentToday: 99999, updatedAt: new Date().toISOString() })
             .eq('provider', providerId);
           
-          logger.error(`[AccountBlocked] Conta ${providerId} desativada: ${result.error}`);
+          logger.error(`[AccountBlocked] Conta ${providerId} pausada até a meia-noite devido a bloqueio: ${result.error}`);
         });
       }
 

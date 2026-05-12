@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 function formatDate(d: string | null) {
   if (!d) return "—";
   return new Date(d).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
   });
 }

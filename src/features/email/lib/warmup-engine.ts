@@ -121,8 +121,8 @@ export function shouldDeactivateAccount(
 
   if (bounceRate > maxRate) {
     return { 
-      deactivate: true, 
-      reason: `Taxa de bounce ${bounceRate.toFixed(1)}% excede o limite de ${maxRate}% para conta ${tier}` 
+      deactivate: false, 
+      reason: `Taxa de bounce ${bounceRate.toFixed(1)}% excede o limite. Será despriorizada na roleta, mas não desativada.` 
     };
   }
 

@@ -12,6 +12,7 @@ export function cn(...inputs: ClassValue[]) {
 /** Formata data para exibição no dashboard */
 export function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
