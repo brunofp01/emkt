@@ -77,144 +77,31 @@ export const sendEmail = inngest.createFunction(
 
     if (campaignContact.isPaused) return { skipped: true, reason: "Contact is paused" };
 
-    // 3. SELEÇÃO + VALIDAÇÃO DO PROVEDOR (step único para evitar deadlock)
-    // Se este step falha, Inngest faz retry e re-executa a seleção com outro provedor
-    const providerResult = await step.run("select-and-validate-provider", async () => {
-      // Selecionar provedor com capacidade
-      const { providerId, providerConfig } = await selectProviderForSend();
-      
-      // Verificar tier
-      const accountTier = await checkAndUpdateTier(providerId);
-      
-      // Verificar saúde da conta
-      const healthCheck = shouldDeactivateAccount(
-        accountTier as AccountTier,
-        providerConfig.totalSent || 0,
-        providerConfig.totalBounces || 0,
-        providerConfig.totalComplaints || 0
-      );
-      
-      if (healthCheck.deactivate) {
-        await supabaseAdmin
-          .from('ProviderConfig')
-          .update({ isActive: false, updatedAt: new Date().toISOString() })
-          .eq('provider', providerId);
-        
-        logger.error(`[AutoDeactivation] Conta ${providerId} desativada: ${healthCheck.reason}`);
-        return { ok: false, reason: healthCheck.reason, providerId, providerConfig, accountTier };
-      }
-
-      // Verificar limite diário com warmup
-      const now = new Date();
-      const lastReset = new Date(providerConfig.lastResetAt);
-      const isNewDay = now.toDateString() !== lastReset.toDateString();
-
-      if (isNewDay) {
-        await supabaseAdmin
-          .from('ProviderConfig')
-          .update({ sentToday: 0, lastResetAt: now.toISOString(), updatedAt: now.toISOString() })
-          .eq('provider', providerId);
-      } else {
-        const effectiveLimit = getEffectiveDailyLimit(
-          providerConfig.dailyLimit,
-          accountTier as AccountTier,
-          new Date(providerConfig.warmupStartedAt || providerConfig.createdAt)
-        );
-
-        // Buscar sentToday atualizado (pode ter mudado desde que selecionamos)
-        const { data: freshConfig } = await supabaseAdmin
-          .from('ProviderConfig')
-          .select('sentToday')
-          .eq('provider', providerId)
-          .single();
-
-        const currentSent = freshConfig?.sentToday || 0;
-        
-        if (currentSent >= effectiveLimit) {
-          logger.info(`[WarmupThrottle] ${providerId} (${accountTier}): ${currentSent}/${effectiveLimit} — atingiu limite, Inngest irá pausar.`);
-          
-          // NÃO lance erro (que esgota retries e falha o evento). 
-          // Retorne um sinal especial para que o fluxo principal possa dormir até amanhã!
-          return { ok: false, reason: "limit_reached", providerId, providerConfig, accountTier };
-        }
-      }
-
-      // Gravar provedor selecionado
-      await supabaseAdmin
-        .from('CampaignContact')
-        .update({ usedProvider: providerId })
-        .eq('id', campaignContactId);
-
-      return { ok: true, providerId, providerConfig, accountTier };
-    });
-
-    if (!providerResult.ok) {
-      if ((providerResult as any).reason === "limit_reached") {
-         // O limite diário de todos os provedores ou do selecionado esgotou.
-         // Vamos dormir até a meia-noite do dia seguinte!
-         const now = new Date();
-         const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0); // 00:05 am amanhã
-         
-         await step.sleepUntil("wait-for-daily-reset", tomorrow);
-         
-         // Lançamos erro controlável para que o Inngest tente novamente do zero amanhã.
-         // O retry count será incrementado, mas podemos aumentar os retries globais se necessário.
-         // Ou melhor ainda, simplesmente falhamos este step para o Retry pegar AMANHÃ!
-         throw new Error("Limites diários esgotados. Dormiu até meia-noite e agora vai tentar de novo.");
-      }
-      return { skipped: true, reason: `Account issue: ${(providerResult as any).reason}` };
-    }
-
-    const { providerId, providerConfig, accountTier } = providerResult as {
-      ok: true;
-      providerId: string;
-      providerConfig: any;
-      accountTier: string;
-    };
-
-    logger.info(`[Roleta] Email para ${contact.email} → Provedor: ${providerId}`);
-
-    // 4. DELAY DE WARMUP — Espaçar envios para parecer comportamento humano
-    const delaySec = getSendDelay(accountTier as AccountTier);
-    await step.sleep("warmup-send-delay", `${delaySec}s`);
-
-    // 5. Buscar step config para A/B testing
+    // 3. Preparar Renderização (Fora do laço para não repetir trabalho)
     const stepConfig = await step.run("fetch-step-config", async () => {
       if (!campaignContact.currentStepId) return null;
-      const { data } = await supabaseAdmin
-        .from('CampaignStep')
-        .select('*')
-        .eq('id', campaignContact.currentStepId)
-        .single();
+      const { data } = await supabaseAdmin.from('CampaignStep').select('*').eq('id', campaignContact.currentStepId).single();
       return data;
     });
 
-    // 6. Lógica de A/B Testing
     let selectedSubject = subject;
     let selectedHtml = htmlBody;
 
     if (stepConfig?.isABTest) {
       let variant = campaignContact.abVariant;
-      
       if (!variant) {
         variant = Math.random() > 0.5 ? "B" : "A";
         await step.run("assign-ab-variant", async () => {
-          await supabaseAdmin
-            .from('CampaignContact')
-            .update({ abVariant: variant })
-            .eq('id', campaignContactId);
+          await supabaseAdmin.from('CampaignContact').update({ abVariant: variant }).eq('id', campaignContactId);
         });
       }
-
       if (variant === "B" && stepConfig.htmlBodyB) {
         selectedSubject = stepConfig.subjectB || subject;
         selectedHtml = stepConfig.htmlBodyB;
       }
     }
 
-    // 7. Renderização Final de Variáveis + URL de Unsubscribe
     const unsubscribeUrl = generateUnsubscribeUrl(contact.id);
-    
     const templateVars = {
       contactId: contact.id,
       contactName: contact.name ?? "",
@@ -227,30 +114,88 @@ export const sendEmail = inngest.createFunction(
     const renderedHtml = renderTemplate(selectedHtml, templateVars);
 
     const trackedHtml = await step.run("apply-link-tracking", async () => {
-      return rewriteLinks({
-        html: renderedHtml,
-        campaignContactId,
-        baseUrl: BASE_URL
-      });
+      return rewriteLinks({ html: renderedHtml, campaignContactId, baseUrl: BASE_URL });
     });
 
-    // 8. Disparo via SDK do Provedor selecionado pela roleta
-    const result = await step.run("send-via-provider", async () => {
-      const provider = await getEmailProvider(providerId);
-      return provider.send({
-        to: contact.email,
-        from: providerConfig.fromEmail,
-        fromName: providerConfig.fromName,
-        subject: renderedSubject,
-        html: trackedHtml,
-        text: textBody,
-        replyTo: providerConfig.fromEmail,
-        unsubscribeUrl,
-        contactId: contact.id,
-      });
-    });
+    // 4. AUTOMAÇÃO DE FALLBACK (PLANO B) - Laço de tentativas
+    const { data: activeConfigs } = await supabaseAdmin.from('ProviderConfig').select('provider').eq('isActive', true);
+    const maxAttempts = activeConfigs && activeConfigs.length > 0 ? activeConfigs.length : 1;
+    
+    let finalSuccess = false;
+    let finalProviderId: string | null = null;
+    let finalProviderConfig: any = null;
+    let finalMessageId: string | null = null;
 
-    if (!result.success) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const providerResult = await step.run(`select-and-validate-provider-v2-${attempt}`, async () => {
+        const { providerId, providerConfig } = await selectProviderForSend();
+        const accountTier = await checkAndUpdateTier(providerId);
+        
+        const healthCheck = shouldDeactivateAccount(
+          accountTier as AccountTier,
+          providerConfig.totalSent || 0,
+          providerConfig.totalBounces || 0,
+          providerConfig.totalComplaints || 0
+        );
+        
+        if (healthCheck.deactivate) {
+          await supabaseAdmin.from('ProviderConfig').update({ isActive: false, updatedAt: new Date().toISOString() }).eq('provider', providerId);
+          logger.error(`[AutoDeactivation] Conta ${providerId} desativada: ${healthCheck.reason}`);
+          return { ok: false, reason: healthCheck.reason, providerId, providerConfig, accountTier };
+        }
+
+        const now = new Date();
+        const lastReset = new Date(providerConfig.lastResetAt);
+        const isNewDay = now.toDateString() !== lastReset.toDateString();
+
+        if (isNewDay) {
+          await supabaseAdmin.from('ProviderConfig').update({ sentToday: 0, lastResetAt: now.toISOString(), updatedAt: now.toISOString() }).eq('provider', providerId);
+        } else {
+          const effectiveLimit = getEffectiveDailyLimit(providerConfig.dailyLimit, accountTier as AccountTier, new Date(providerConfig.warmupStartedAt || providerConfig.createdAt));
+          const { data: freshConfig } = await supabaseAdmin.from('ProviderConfig').select('sentToday').eq('provider', providerId).single();
+          const currentSent = freshConfig?.sentToday || 0;
+          
+          if (currentSent >= effectiveLimit) {
+            return { ok: false, reason: "limit_reached", providerId, providerConfig, accountTier };
+          }
+        }
+
+        await supabaseAdmin.from('CampaignContact').update({ usedProvider: providerId }).eq('id', campaignContactId);
+        return { ok: true, providerId, providerConfig, accountTier };
+      });
+
+      if (!providerResult.ok) {
+        if ((providerResult as any).reason === "limit_reached") {
+           const now = new Date();
+           const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0); 
+           await step.sleepUntil("wait-for-daily-reset", tomorrow);
+           throw new Error("Limites diários esgotados de todas as contas. O sistema vai dormir até a meia-noite.");
+        }
+        continue;
+      }
+
+      const { providerId, providerConfig, accountTier } = providerResult as any;
+      logger.info(`[Roleta - Tentativa ${attempt}/${maxAttempts}] Email para ${contact.email} → Provedor: ${providerId}`);
+
+      const delaySec = getSendDelay(accountTier as AccountTier);
+      await step.sleep(`warmup-send-delay-${attempt}`, `${delaySec}s`);
+
+      const result = await step.run(`send-via-provider-${attempt}`, async () => {
+        const provider = await getEmailProvider(providerId);
+        return provider.send({
+          to: contact.email, from: providerConfig.fromEmail, fromName: providerConfig.fromName,
+          subject: renderedSubject, html: trackedHtml, text: textBody, replyTo: providerConfig.fromEmail, unsubscribeUrl, contactId: contact.id
+        });
+      });
+
+      if (result.success) {
+        finalSuccess = true;
+        finalProviderId = providerId;
+        finalProviderConfig = providerConfig;
+        finalMessageId = result.messageId || null;
+        break; // Entregue com sucesso! Interrompe o loop.
+      }
+
       const isBlocked = (result as any).accountBlocked;
       const isPermanentFailure = result.error?.toLowerCase().includes('bounce') || 
                                  result.error?.toLowerCase().includes('rejected') ||
@@ -258,32 +203,32 @@ export const sendEmail = inngest.createFunction(
                                  result.error?.toLowerCase().includes('not found');
       
       if (isBlocked) {
-        await step.run("pause-blocked-account", async () => {
-          // Em vez de desativar permanentemente, "esgotamos" o limite de hoje
-          // para que a conta durma até meia-noite e ressuscite automaticamente amanhã.
-          await supabaseAdmin
-            .from('ProviderConfig')
-            .update({ sentToday: 99999, updatedAt: new Date().toISOString() })
-            .eq('provider', providerId);
-          
-          logger.error(`[AccountBlocked] Conta ${providerId} pausada até a meia-noite devido a bloqueio: ${result.error}`);
+        await step.run(`pause-blocked-account-${attempt}`, async () => {
+          await supabaseAdmin.from('ProviderConfig').update({ sentToday: 99999, updatedAt: new Date().toISOString() }).eq('provider', providerId);
+          logger.error(`[AccountBlocked] Conta ${providerId} bloqueou no limite (Attempt ${attempt}). Pausando e tentando próxima...`);
         });
+        continue; // Pula para a próxima conta na roleta!
       }
 
-      // Registrar bounce APENAS se for erro real de entrega
       if (isPermanentFailure) {
-        await step.run("record-bounce", async () => {
+        await step.run(`record-bounce-${attempt}`, async () => {
           await recordSendResult(providerId, "bounced");
         });
+        logger.error(`Falha permanente no destinatário via ${providerId}`, result.error);
+        throw new Error(`Falha permanente no destinatário: ${result.error}`);
       }
-      
-      logger.error(`Falha no envio via ${providerId}`, result.error, { contactId, campaignContactId });
-      throw new Error(`Falha no envio via ${providerId}: ${result.error}`);
+
+      logger.error(`Falha temporária via ${providerId}, tentando próxima conta...`, result.error);
+      continue;
     }
 
-    // 9. ATUALIZAR STATUS DO CAMPAIGNCONTACT (separado do incremento)
+    if (!finalSuccess) {
+      throw new Error(`O Fallback esgotou! Todas as ${maxAttempts} tentativas de provedores falharam para o contato ${contact.email}.`);
+    }
+
+    // 5. ATUALIZAR STATUS FINAL
     await step.run("update-campaign-contact", async () => {
-      const isSMTP = providerConfig?.providerType === 'SMTP';
+      const isSMTP = finalProviderConfig?.providerType === 'SMTP';
       const finalStatus = isSMTP ? "DELIVERED" : "SENT";
       const now = new Date().toISOString();
       
@@ -291,9 +236,9 @@ export const sendEmail = inngest.createFunction(
         .from('CampaignContact')
         .update({
           stepStatus: finalStatus,
-          lastMessageId: result.messageId,
+          lastMessageId: finalMessageId,
           lastSentAt: now,
-          usedProvider: providerId,
+          usedProvider: finalProviderId,
         })
         .eq('id', campaignContactId);
     });
