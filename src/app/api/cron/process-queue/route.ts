@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { getEmailProvider } from "@/features/email/providers";
 import { selectProviderForSend } from "@/features/email/lib/provider-selector";
-import { renderCampaignTemplate } from "@/features/email/lib/template-renderer";
+import { renderTemplate, renderSubject, generateUnsubscribeUrl } from "@/features/email/lib/template-renderer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Limite máximo para a rota na Vercel Hobby/Pro
@@ -57,13 +57,16 @@ export async function GET(req: Request) {
           if (!stepConfig) return;
 
           // Renderizar template
-          const { subject, htmlBody } = renderCampaignTemplate(
-            stepConfig.subject,
-            stepConfig.htmlBody || "",
-            cc.contact,
-            cc.id,
-            "https://mktemail.vercel.app/api/tracking"
-          );
+          const unsubscribeUrl = generateUnsubscribeUrl(cc.contact.id);
+          const templateVars = {
+            contactId: cc.contact.id,
+            contactName: cc.contact.name ?? "",
+            contactEmail: cc.contact.email,
+            unsubscribeUrl,
+          };
+
+          const subject = renderSubject(stepConfig.subject, templateVars);
+          const htmlBody = renderTemplate(stepConfig.htmlBody || "", templateVars);
 
           // Disparar o Email
           const result = await provider.send({
