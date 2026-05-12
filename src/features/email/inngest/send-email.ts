@@ -27,7 +27,7 @@ const BASE_URL = env.NEXT_PUBLIC_APP_URL;
 
 export const sendEmail = inngest.createFunction(
   {
-    id: "send-email",
+    id: "send-email-v2",
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
