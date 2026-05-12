@@ -31,7 +31,7 @@ export const sendEmail = inngest.createFunction(
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
-      limit: 10, // Processa no máximo 10 envios simultâneos para evitar sobrecarga no banco e rate limits
+      limit: 5, // Limite máximo permitido pelo plano Free do Inngest
     },
     triggers: [{ event: "email/send" }],
   },
