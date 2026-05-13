@@ -12,7 +12,23 @@ interface ContactDetailPageProps {
 
 export default async function ContactDetailPage({ params }: ContactDetailPageProps) {
   const { id } = await params;
-  const contact = await getContactById(id);
+  
+  let contact;
+  try {
+    contact = await getContactById(id);
+  } catch {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Link href="/contacts" className="inline-flex items-center gap-2 text-sm text-surface-500 hover:text-surface-300">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Link>
+        <div className="glass-card p-8 text-center">
+          <p className="text-surface-400">Não foi possível carregar os dados do contato.</p>
+          <Link href={`/contacts/${id}`} className="btn btn-primary mt-4 inline-flex text-sm">Tentar novamente</Link>
+        </div>
+      </div>
+    );
+  }
   if (!contact) notFound();
 
   const providerLabel = contact.provider;

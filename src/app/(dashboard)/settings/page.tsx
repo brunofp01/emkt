@@ -121,22 +121,26 @@ export default async function SettingsPage() {
         )}
       </div>
 
-      {/* Outras configurações */}
+      {/* Links rápidos */}
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="glass-card p-6 space-y-4">
+        <a href="/diagnostics" className="glass-card p-6 space-y-4 hover:border-primary-500/30 transition-colors group">
           <div className="flex items-center gap-3 text-primary-400">
             <Shield className="h-5 w-5" />
-            <h2 className="font-semibold text-surface-100">Segurança</h2>
+            <h2 className="font-semibold text-surface-100 group-hover:text-primary-400 transition-colors">Diagnóstico do Sistema</h2>
           </div>
-          <p className="text-sm text-surface-400">Altere sua senha e gerencie sessões ativas.</p>
-        </div>
+          <p className="text-sm text-surface-400">Verifique a saúde de todos os subsistemas: provedores, fila, Inngest e variáveis de ambiente.</p>
+        </a>
 
         <div className="glass-card p-6 space-y-4">
           <div className="flex items-center gap-3 text-primary-400">
             <Database className="h-5 w-5" />
-            <h2 className="font-semibold text-surface-100">Plano e Faturamento</h2>
+            <h2 className="font-semibold text-surface-100">Informações do Sistema</h2>
           </div>
-          <p className="text-sm text-surface-400">Gerencie sua assinatura e veja seu histórico de faturas.</p>
+          <div className="space-y-2 text-sm text-surface-400">
+            <p><span className="text-surface-500">Versão:</span> <span className="font-mono text-surface-300">1.0.0</span></p>
+            <p><span className="text-surface-500">Framework:</span> <span className="font-mono text-surface-300">Next.js 16 + Supabase</span></p>
+            <p><span className="text-surface-500">Orquestrador:</span> <span className="font-mono text-surface-300">Inngest</span></p>
+          </div>
         </div>
       </div>
     </div>
