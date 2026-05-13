@@ -28,6 +28,11 @@ function rateIndicator(rate: number, goodThreshold: number, warnThreshold: numbe
   return { trendIcon: ArrowDownRight, color: "text-red-400", bg: "bg-red-500/10", rateLabel: "Atenção" };
 }
 
+function pctHelper(v: number, t: number): number {
+  if (t === 0) return 0;
+  return Math.round((v / t) * 100);
+}
+
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const campaignId = params.campaign;
@@ -38,12 +43,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     // Hero KPI cards config
     const heroCards = [
       {
-        label: "Audiência Total",
+        label: campaignId ? "Contatos na Campanha" : "Audiência Total",
         value: stats.totalContacts.toLocaleString("pt-BR"),
         icon: Users,
         gradient: "from-indigo-500 to-blue-600",
-        sub: `${stats.totalActive.toLocaleString("pt-BR")} ativos · ${stats.totalUnsubscribed} cancelados`,
-        ...rateIndicator(stats.totalActive / Math.max(stats.totalContacts, 1) * 100, 90, 70),
+        sub: campaignId
+          ? `${stats.totalSent.toLocaleString("pt-BR")} enviados · ${stats.totalQueued.toLocaleString("pt-BR")} na fila`
+          : `${stats.totalActive.toLocaleString("pt-BR")} ativos · ${stats.totalUnsubscribed} cancelados`,
+        ...rateIndicator(campaignId ? pctHelper(stats.totalSent, stats.totalContacts) : stats.totalActive / Math.max(stats.totalContacts, 1) * 100, 90, 70),
       },
       {
         label: "Emails Enviados",
@@ -82,7 +89,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         value: `${stats.bounceRate}%`,
         icon: AlertTriangle,
         gradient: "from-red-500 to-rose-600",
-        sub: `${(stats.totalBounced + stats.totalFailed).toLocaleString("pt-BR")} rejeições`,
+        sub: `${stats.totalBounced.toLocaleString("pt-BR")} rejeições`,
         trendIcon: stats.bounceRate <= 2 ? ArrowDownRight : ArrowUpRight,
         color: stats.bounceRate <= 2 ? "text-emerald-400" : stats.bounceRate <= 5 ? "text-amber-400" : "text-red-400",
         bg: stats.bounceRate <= 2 ? "bg-emerald-500/10" : stats.bounceRate <= 5 ? "bg-amber-500/10" : "bg-red-500/10",
