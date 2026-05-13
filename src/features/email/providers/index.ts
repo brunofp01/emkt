@@ -7,11 +7,13 @@
 import type { EmailProviderAdapter } from "@/shared/types";
 import { brevoProvider } from "./brevo";
 import { createSmtpProvider } from "./smtp";
+import { createMailrelayProvider } from "./mailrelay";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 
 /**
  * Retorna o adaptador de email correto baseado na configuração do provedor no banco.
  * Para APIs como o Brevo, retorna a instância estática.
+ * Para Mailrelay, cria instância dinâmica com subdomínio + API key.
  * Para contas SMTP, cria uma instância dinamicamente usando as credenciais.
  */
 export async function getEmailProvider(providerId: string): Promise<EmailProviderAdapter> {
@@ -28,6 +30,16 @@ export async function getEmailProvider(providerId: string): Promise<EmailProvide
   // Se for o Brevo (API fixo que restou)
   if (config.providerType === "API_BREVO") {
     return brevoProvider;
+  }
+
+  // Se for o Mailrelay (API REST v1)
+  if (config.providerType === "API_MAILRELAY") {
+    const apiKey = process.env.MAILRELAY_API_KEY;
+    const subdomain = process.env.MAILRELAY_SUBDOMAIN;
+    if (!apiKey || !subdomain) {
+      throw new Error("MAILRELAY_API_KEY e MAILRELAY_SUBDOMAIN devem estar configurados no .env");
+    }
+    return createMailrelayProvider(subdomain, apiKey);
   }
 
   // Para qualquer outro, assumimos que é SMTP
