@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 import {
   Mail, TrendingUp, Activity, Zap, Eye, MousePointerClick,
   ArrowUpRight, ArrowDownRight, ShieldCheck, AlertTriangle,
-  SendHorizonal, Clock, Server, UserMinus,
+  SendHorizonal, Clock, Server, Users,
 } from "lucide-react";
 import { getDashboardStats } from "@/features/analytics/lib/queries";
 import { formatDate } from "@/shared/lib/utils";
@@ -38,11 +38,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     // Hero KPI cards config
     const heroCards = [
       {
+        label: "Audiência Total",
+        value: stats.totalContacts.toLocaleString("pt-BR"),
+        icon: Users,
+        gradient: "from-indigo-500 to-blue-600",
+        sub: `${stats.totalActive.toLocaleString("pt-BR")} ativos · ${stats.totalUnsubscribed} cancelados`,
+        ...rateIndicator(stats.totalActive / Math.max(stats.totalContacts, 1) * 100, 90, 70),
+      },
+      {
         label: "Emails Enviados",
         value: stats.totalSent.toLocaleString("pt-BR"),
         icon: Mail,
-        gradient: "from-blue-500 to-indigo-600",
-        sub: `${stats.totalDelivered.toLocaleString("pt-BR")} entregues`,
+        gradient: "from-blue-500 to-cyan-600",
+        sub: `${stats.totalQueued.toLocaleString("pt-BR")} na fila`,
         ...rateIndicator(stats.deliveryRate, 95, 85),
       },
       {
@@ -50,7 +58,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         value: `${stats.deliveryRate}%`,
         icon: ShieldCheck,
         gradient: "from-emerald-500 to-teal-600",
-        sub: stats.deliveryRate >= 95 ? "Reputação saudável" : "Monitorar bounces",
+        sub: `${stats.totalDelivered.toLocaleString("pt-BR")} entregues`,
         ...rateIndicator(stats.deliveryRate, 95, 85),
       },
       {
@@ -74,19 +82,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         value: `${stats.bounceRate}%`,
         icon: AlertTriangle,
         gradient: "from-red-500 to-rose-600",
-        sub: `${stats.totalBounced.toLocaleString("pt-BR")} rejeições`,
+        sub: `${(stats.totalBounced + stats.totalFailed).toLocaleString("pt-BR")} rejeições`,
         trendIcon: stats.bounceRate <= 2 ? ArrowDownRight : ArrowUpRight,
         color: stats.bounceRate <= 2 ? "text-emerald-400" : stats.bounceRate <= 5 ? "text-amber-400" : "text-red-400",
         bg: stats.bounceRate <= 2 ? "bg-emerald-500/10" : stats.bounceRate <= 5 ? "bg-amber-500/10" : "bg-red-500/10",
         rateLabel: stats.bounceRate <= 2 ? "Ótimo" : stats.bounceRate <= 5 ? "Monitorar" : "Crítico",
-      },
-      {
-        label: "Cancelamentos",
-        value: stats.totalUnsubscribed.toLocaleString("pt-BR"),
-        icon: UserMinus,
-        gradient: "from-slate-500 to-gray-600",
-        sub: `${stats.unsubscribeRate}% taxa`,
-        ...rateIndicator(100 - stats.unsubscribeRate, 99, 95),
       },
     ];
 
@@ -111,7 +111,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         {/* Hero KPIs */}
-        <div className="grid gap-4 sm:gap-5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 stagger-children">
+        <div className="grid gap-4 sm:gap-5 grid-cols-2 lg:grid-cols-3 stagger-children">
           {heroCards.map((card) => {
             const Icon = card.icon;
             const TrendIcon = card.trendIcon || card.icon;

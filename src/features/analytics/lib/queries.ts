@@ -1,26 +1,31 @@
 /**
- * Dashboard Analytics — Queries otimizadas com filtro por campanha.
+ * Dashboard Analytics — Queries corrigidas com dados reais.
  * 
- * getDashboardStats(campaignId?) retorna todas as métricas.
- * Quando campaignId é fornecido, filtra tudo por essa campanha.
+ * IMPORTANTE: Opens e Clicks vêm da tabela EmailEvent, NÃO de CampaignContact.stepStatus.
+ * CampaignContact.stepStatus pode não ser atualizado para OPENED/CLICKED se o webhook
+ * registra o evento mas não atualiza o status do contato.
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
 
 export interface DashboardStats {
-  // Hero KPIs
+  // Audiência
   totalContacts: number;
+  totalActive: number;
+  totalUnsubscribed: number;
+  // Envio (de CampaignContact)
   totalSent: number;
   totalDelivered: number;
-  totalOpened: number;
-  totalClicked: number;
   totalBounced: number;
   totalFailed: number;
-  totalUnsubscribed: number;
+  totalQueued: number;
+  // Engajamento (de EmailEvent — dados reais)
+  totalOpened: number;
+  totalClicked: number;
   // Rates
   deliveryRate: number;
   openRate: number;
   clickRate: number;
-  ctorRate: number; // Click-to-Open Rate
+  ctorRate: number;
   bounceRate: number;
   unsubscribeRate: number;
   // Charts
@@ -29,27 +34,15 @@ export interface DashboardStats {
   growthData: { date: string; count: number }[];
   // Campaigns table
   campaignsPerformance: {
-    id: string;
-    name: string;
-    status: string;
-    total: number;
-    sent: number;
-    delivered: number;
-    opened: number;
-    clicked: number;
-    bounced: number;
-    openRate: number;
-    ctorRate: number;
-    bounceRate: number;
+    id: string; name: string; status: string;
+    total: number; sent: number; delivered: number;
+    opened: number; clicked: number; bounced: number;
+    openRate: number; ctorRate: number; bounceRate: number;
   }[];
   // Provider health
   providerHealth: {
-    provider: string;
-    isActive: boolean;
-    sentToday: number;
-    dailyLimit: number;
-    accountTier: string;
-    usagePct: number;
+    provider: string; isActive: boolean; sentToday: number;
+    dailyLimit: number; accountTier: string; usagePct: number;
   }[];
   // Queue snapshot
   queueSnapshot: { queued: number; sending: number; sent: number; failed: number };
@@ -57,12 +50,11 @@ export interface DashboardStats {
   recentEvents: any[];
   // Campaign list for selector
   allCampaigns: { id: string; name: string; status: string }[];
-  // Filter state
   filteredCampaignName: string | null;
 }
 
 export async function getDashboardStats(campaignId?: string): Promise<DashboardStats> {
-  // ── 1. Campaign list (always unfiltered) ──
+  // ── 1. Todas as campanhas (para o seletor — sempre sem filtro) ──
   const { data: allCampaigns } = await supabaseAdmin
     .from('Campaign')
     .select('id, name, status')
@@ -70,62 +62,108 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
 
   let filteredCampaignName: string | null = null;
   if (campaignId) {
-    const match = (allCampaigns || []).find(c => c.id === campaignId);
-    filteredCampaignName = match?.name || null;
+    filteredCampaignName = (allCampaigns || []).find(c => c.id === campaignId)?.name || null;
   }
 
-  // ── 2. CampaignContact data (filtered if campaignId provided) ──
-  let ccQuery = supabaseAdmin.from('CampaignContact').select('campaignId, stepStatus');
+  // ── 2. CampaignContact (filtrado se campaignId) — para envios e fila ──
+  let ccQuery = supabaseAdmin.from('CampaignContact').select('id, campaignId, stepStatus');
   if (campaignId) ccQuery = ccQuery.eq('campaignId', campaignId);
   const { data: ccData } = await ccQuery;
 
-  // Aggregate status counts
-  const statusCounts: Record<string, number> = {};
-  const campaignAgg = new Map<string, { total: number; sent: number; delivered: number; opened: number; clicked: number; bounced: number }>();
+  // Mapear IDs de CampaignContact para filtrar EmailEvents por campanha
+  const ccIds = new Set((ccData || []).map(cc => cc.id));
+
+  // Agregar status por campanha
+  const campaignAgg = new Map<string, { total: number; sent: number; delivered: number; bounced: number; queued: number }>();
+  const queueSnapshot = { queued: 0, sending: 0, sent: 0, failed: 0 };
+
+  let totalSent = 0, totalDelivered = 0, totalBounced = 0, totalFailed = 0, totalQueued = 0;
 
   if (ccData) {
     for (const cc of ccData) {
       const s = cc.stepStatus;
-      statusCounts[s] = (statusCounts[s] || 0) + 1;
 
-      // Per-campaign aggregation
+      // Global counts
+      if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(s)) totalSent++;
+      if (['DELIVERED', 'OPENED', 'CLICKED'].includes(s)) totalDelivered++;
+      if (s === 'BOUNCED') totalBounced++;
+      if (s === 'FAILED') totalFailed++;
+      if (s === 'QUEUED' || s === 'PENDING') totalQueued++;
+
+      // Queue snapshot
+      if (s === 'PENDING' || s === 'QUEUED') queueSnapshot.queued++;
+      else if (s === 'SENDING') queueSnapshot.sending++;
+      else if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(s)) queueSnapshot.sent++;
+      else if (s === 'BOUNCED' || s === 'FAILED') queueSnapshot.failed++;
+
+      // Per-campaign
       if (!campaignAgg.has(cc.campaignId)) {
-        campaignAgg.set(cc.campaignId, { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0 });
+        campaignAgg.set(cc.campaignId, { total: 0, sent: 0, delivered: 0, bounced: 0, queued: 0 });
       }
       const m = campaignAgg.get(cc.campaignId)!;
       m.total++;
       if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(s)) m.sent++;
       if (['DELIVERED', 'OPENED', 'CLICKED'].includes(s)) m.delivered++;
-      if (['OPENED', 'CLICKED'].includes(s)) m.opened++;
-      if (s === 'CLICKED') m.clicked++;
       if (s === 'BOUNCED' || s === 'FAILED') m.bounced++;
+      if (s === 'QUEUED' || s === 'PENDING') m.queued++;
     }
   }
 
-  const totalSent = (statusCounts['SENT'] || 0) + (statusCounts['DELIVERED'] || 0) + (statusCounts['OPENED'] || 0) + (statusCounts['CLICKED'] || 0);
-  const totalDelivered = (statusCounts['DELIVERED'] || 0) + (statusCounts['OPENED'] || 0) + (statusCounts['CLICKED'] || 0);
-  const totalOpened = (statusCounts['OPENED'] || 0) + (statusCounts['CLICKED'] || 0);
-  const totalClicked = statusCounts['CLICKED'] || 0;
-  const totalBounced = (statusCounts['BOUNCED'] || 0) + (statusCounts['FAILED'] || 0);
+  // ── 3. EmailEvents — FONTE REAL de opens e clicks ──
+  let evQuery = supabaseAdmin.from('EmailEvent').select('eventType, campaignContactId');
+  // Não filtramos por campaignId diretamente; filtraremos pelos ccIds
+  const { data: allEvents } = await evQuery;
 
-  // ── 3. Contacts + Unsubscribed ──
+  let totalOpened = 0, totalClicked = 0;
+  const campaignEventAgg = new Map<string, { opened: number; clicked: number }>();
+
+  // Mapear ccId → campaignId para agregar por campanha
+  const ccToCampaign = new Map<string, string>();
+  if (ccData) {
+    for (const cc of ccData) {
+      ccToCampaign.set(cc.id, cc.campaignId);
+    }
+  }
+
+  if (allEvents) {
+    for (const ev of allEvents) {
+      // Se filtro por campanha, ignorar events de outras campanhas
+      if (campaignId && !ccIds.has(ev.campaignContactId)) continue;
+
+      if (ev.eventType === 'OPENED') totalOpened++;
+      if (ev.eventType === 'CLICKED') totalClicked++;
+
+      // Per-campaign aggregation
+      const cId = ccToCampaign.get(ev.campaignContactId);
+      if (cId) {
+        if (!campaignEventAgg.has(cId)) campaignEventAgg.set(cId, { opened: 0, clicked: 0 });
+        const m = campaignEventAgg.get(cId)!;
+        if (ev.eventType === 'OPENED') m.opened++;
+        if (ev.eventType === 'CLICKED') m.clicked++;
+      }
+    }
+  }
+
+  // ── 4. Contatos — Audiência ──
   const [
     { count: totalContacts },
     { count: totalUnsubscribed },
+    { count: totalActive },
   ] = await Promise.all([
     supabaseAdmin.from('Contact').select('*', { count: 'exact', head: true }),
     supabaseAdmin.from('Contact').select('*', { count: 'exact', head: true }).eq('status', 'UNSUBSCRIBED'),
+    supabaseAdmin.from('Contact').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
   ]);
 
-  // ── 4. Rates ──
+  // ── 5. Rates ──
   const deliveryRate = pct(totalDelivered, totalSent);
-  const openRate = pct(totalOpened, totalDelivered);
-  const clickRate = pct(totalClicked, totalDelivered);
+  const openRate = pct(totalOpened, totalSent);
+  const clickRate = pct(totalClicked, totalSent);
   const ctorRate = pct(totalClicked, totalOpened);
-  const bounceRate = pct(totalBounced, totalSent);
-  const unsubscribeRate = pct(totalUnsubscribed || 0, totalDelivered);
+  const bounceRate = pct(totalBounced + totalFailed, totalSent);
+  const unsubscribeRate = pct(totalUnsubscribed || 0, totalContacts || 0);
 
-  // ── 5. Funnel data ──
+  // ── 6. Funnel — números reais ──
   const funnelData = [
     { name: 'Enviados', value: totalSent, fill: '#3b82f6', pct: '100%' },
     { name: 'Entregues', value: totalDelivered, fill: '#10b981', pct: `${deliveryRate}%` },
@@ -133,22 +171,21 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
     { name: 'Clicados', value: totalClicked, fill: '#8b5cf6', pct: `${ctorRate}%` },
   ];
 
-  // ── 6. Timeline (30 days) ──
+  // ── 7. Timeline (30 dias) ──
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  let evQuery = supabaseAdmin
+  const { data: recentEvents } = await supabaseAdmin
     .from('EmailEvent')
     .select('eventType, timestamp, campaignContactId')
     .gte('timestamp', thirtyDaysAgo.toISOString())
     .order('timestamp', { ascending: false })
-    .limit(500);
-
-  const { data: recentEvents } = await evQuery;
+    .limit(1000);
 
   const timelineMap: Record<string, { date: string; sent: number; opened: number; clicked: number; bounced: number }> = {};
   if (recentEvents) {
     for (const e of recentEvents) {
+      if (campaignId && !ccIds.has(e.campaignContactId)) continue;
       const date = new Date(e.timestamp).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
       if (!timelineMap[date]) timelineMap[date] = { date, sent: 0, opened: 0, clicked: 0, bounced: 0 };
       if (e.eventType === 'SENT' || e.eventType === 'DELIVERED') timelineMap[date].sent++;
@@ -165,14 +202,14 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
     return new Date(year, parseInt(ma) - 1, parseInt(da)).getTime() - new Date(year, parseInt(mb) - 1, parseInt(db)).getTime();
   }).slice(-14);
 
-  // ── 7. Growth (7 days) ──
+  // ── 8. Growth (7 dias) ──
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const { data: recentContacts } = await supabaseAdmin
     .from('Contact')
     .select('createdAt')
     .gte('createdAt', sevenDaysAgo.toISOString())
-    .limit(500);
+    .limit(1000);
 
   const growthMap: Record<string, number> = {};
   if (recentContacts) {
@@ -188,24 +225,25 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
       return new Date(year, parseInt(ma) - 1, parseInt(da)).getTime() - new Date(year, parseInt(mb) - 1, parseInt(db)).getTime();
     }).slice(-7);
 
-  // ── 8. Campaigns performance table ──
+  // ── 9. Performance por campanha (merge CC + Events) ──
   const campaignsPerformance = (allCampaigns || []).map(c => {
-    const m = campaignAgg.get(c.id) || { total: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0 };
+    const ccMetrics = campaignAgg.get(c.id) || { total: 0, sent: 0, delivered: 0, bounced: 0, queued: 0 };
+    const evMetrics = campaignEventAgg.get(c.id) || { opened: 0, clicked: 0 };
     return {
       ...c,
-      total: m.total,
-      sent: m.sent,
-      delivered: m.delivered,
-      opened: m.opened,
-      clicked: m.clicked,
-      bounced: m.bounced,
-      openRate: pct(m.opened, m.delivered),
-      ctorRate: pct(m.clicked, m.opened),
-      bounceRate: pct(m.bounced, m.sent),
+      total: ccMetrics.total,
+      sent: ccMetrics.sent,
+      delivered: ccMetrics.delivered,
+      opened: evMetrics.opened,
+      clicked: evMetrics.clicked,
+      bounced: ccMetrics.bounced,
+      openRate: pct(evMetrics.opened, ccMetrics.sent),
+      ctorRate: pct(evMetrics.clicked, evMetrics.opened),
+      bounceRate: pct(ccMetrics.bounced, ccMetrics.sent),
     };
   }).filter(c => c.total > 0).sort((a, b) => b.sent - a.sent);
 
-  // ── 9. Provider health ──
+  // ── 10. Provider health ──
   const { data: providerConfigs } = await supabaseAdmin
     .from('ProviderConfig')
     .select('provider, isActive, sentToday, dailyLimit, accountTier')
@@ -220,18 +258,6 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
     usagePct: p.dailyLimit > 0 ? Math.round(((p.sentToday || 0) / p.dailyLimit) * 100) : 0,
   }));
 
-  // ── 10. Queue snapshot ──
-  const queueSnapshot = { queued: 0, sending: 0, sent: 0, failed: 0 };
-  if (ccData) {
-    for (const cc of ccData) {
-      const s = cc.stepStatus;
-      if (s === 'PENDING' || s === 'QUEUED') queueSnapshot.queued++;
-      else if (s === 'SENDING') queueSnapshot.sending++;
-      else if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(s)) queueSnapshot.sent++;
-      else if (s === 'BOUNCED' || s === 'FAILED') queueSnapshot.failed++;
-    }
-  }
-
   // ── 11. Recent events feed ──
   const { data: feedEvents } = await supabaseAdmin
     .from('EmailEvent')
@@ -241,13 +267,15 @@ export async function getDashboardStats(campaignId?: string): Promise<DashboardS
 
   return {
     totalContacts: totalContacts || 0,
+    totalActive: totalActive || 0,
+    totalUnsubscribed: totalUnsubscribed || 0,
     totalSent,
     totalDelivered,
     totalOpened,
     totalClicked,
     totalBounced,
-    totalFailed: statusCounts['FAILED'] || 0,
-    totalUnsubscribed: totalUnsubscribed || 0,
+    totalFailed,
+    totalQueued,
     deliveryRate,
     openRate,
     clickRate,
