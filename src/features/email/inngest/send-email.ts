@@ -208,6 +208,18 @@ export const sendEmail = inngest.createFunction(
       
       if (isBlocked) {
         await step.run(`pause-blocked-account-${attempt}`, async () => {
+          // Registrar falha no evento para visibilidade
+          await supabaseAdmin.from('EmailEvent').insert({
+            id: Math.random().toString(36).substring(2, 15),
+            externalId: `blocked_${providerId}_${Date.now()}`,
+            contactId: contact.id,
+            messageId: 'account-blocked',
+            provider: providerId,
+            eventType: "FAILED",
+            timestamp: new Date().toISOString(),
+            metadata: { error: result.error, isBlocked: true }
+          });
+
           await supabaseAdmin.from('ProviderConfig').update({ sentToday: 99999, updatedAt: new Date().toISOString() }).eq('provider', providerId);
           logger.error(`[AccountBlocked] Conta ${providerId} bloqueou no limite (Attempt ${attempt}). Pausando e tentando próxima...`);
         });
