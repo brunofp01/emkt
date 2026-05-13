@@ -6,10 +6,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+// Deduplicação: evita múltiplos opens do mesmo ccid em janela de 30s
+const recentOpens = new Map<string, number>();
+const DEDUP_WINDOW_MS = 30_000;
 
 // Imagem 1x1 transparente (GIF)
 const PIXEL = Buffer.from(
@@ -28,6 +31,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Deduplicação: ignorar opens repetidos do mesmo ccid em 30s
+    const now = Date.now();
+    const lastOpen = recentOpens.get(campaignContactId);
+    if (lastOpen && (now - lastOpen) < DEDUP_WINDOW_MS) {
+      return new NextResponse(PIXEL, {
+        headers: { "Content-Type": "image/gif", "Cache-Control": "no-store" },
+      });
+    }
+    recentOpens.set(campaignContactId, now);
+    // Limpar entradas antigas periodicamente
+    if (recentOpens.size > 1000) {
+      for (const [key, ts] of recentOpens) {
+        if (now - ts > DEDUP_WINDOW_MS) recentOpens.delete(key);
+      }
+    }
+
     // 1. Buscar vínculo da campanha
     const { data: cc, error: ccError } = await supabaseAdmin
       .from('CampaignContact')
@@ -37,17 +56,17 @@ export async function GET(req: NextRequest) {
 
     if (!ccError && cc) {
       const provider = (cc as any).contact?.provider || 'SMTP';
-      const now = new Date().toISOString();
+      const timestamp = new Date().toISOString();
 
       // 2. Registrar evento de abertura
       await supabaseAdmin.from('EmailEvent').insert({
-        id: generateId(),
+        id: randomUUID(),
         externalId: `open_${campaignContactId}_${Date.now()}`,
         contactId: cc.contactId,
         messageId: cc.lastMessageId || 'pixel-open',
         provider: provider,
         eventType: "OPENED",
-        timestamp: now,
+        timestamp,
         userAgent: req.headers.get("user-agent") || null,
         ip: req.headers.get("x-forwarded-for")?.split(",")[0] || null,
       });
@@ -61,8 +80,8 @@ export async function GET(req: NextRequest) {
           .from('CampaignContact')
           .update({ 
             stepStatus: 'OPENED', 
-            lastOpenedAt: now,
-            updatedAt: now 
+            lastOpenedAt: timestamp,
+            updatedAt: timestamp 
           })
           .eq('id', campaignContactId);
       }

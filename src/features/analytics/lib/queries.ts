@@ -127,14 +127,14 @@ export async function getDashboardStats() {
   const trendData = Object.values(timelineMap).sort((a: any, b: any) => {
     const [da, ma] = a.date.split('/');
     const [db, mb] = b.date.split('/');
-    return new Date(2026, parseInt(ma)-1, parseInt(da)).getTime() - new Date(2026, parseInt(mb)-1, parseInt(db)).getTime();
+    const year = new Date().getFullYear(); return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
   }).slice(-7);
 
   const growthData = Object.entries(growthMap).map(([date, count]) => ({ date, count }))
     .sort((a, b) => {
       const [da, ma] = a.date.split('/');
       const [db, mb] = b.date.split('/');
-      return new Date(2026, parseInt(ma)-1, parseInt(da)).getTime() - new Date(2026, parseInt(mb)-1, parseInt(db)).getTime();
+      const year = new Date().getFullYear(); return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
     }).slice(-7);
 
   const campaignsPerformance = (campaignsData || []).map((c: any) => {

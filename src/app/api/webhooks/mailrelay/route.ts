@@ -12,9 +12,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 import { recordSendResult } from "@/features/email/lib/warmup-engine";
-import type { EmailEventType } from "@prisma/client";
+import type { EmailEventType } from "@/shared/types";
 
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+import { randomUUID } from "crypto";
+const generateId = () => randomUUID();
 
 /**
  * Mapeamento de eventos do Mailrelay para o enum EmailEventType do sistema.

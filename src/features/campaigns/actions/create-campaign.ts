@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { supabaseAdmin as supabase } from "@/shared/lib/supabase"; // Usando o cliente Admin para estabilidade total
+import { supabaseAdmin as supabase } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
 import { fetchAll } from "@/shared/lib/supabase-utils";
+import { randomUUID } from "crypto";
 
-// Função simples para gerar um ID compatível com o campo String do Prisma
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+const generateId = () => randomUUID();
 
 const DEFAULT_TEMPLATE = `
 <!DOCTYPE html>
@@ -277,41 +277,45 @@ export async function addContactsToCampaign(campaignId: string, contactIds: stri
     
     const firstStep = steps[0];
     const isCampaignActive = campaign.status === 'ACTIVE';
+    const BATCH_SIZE = 100;
 
-    for (const contactId of contactIds) {
-      const contactCampaignId = generateId();
-      
-      // Criar o vínculo
-      const { data: cc, error: ccError } = await supabase
+    for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      const batch = contactIds.slice(i, i + BATCH_SIZE);
+      const now = new Date().toISOString();
+
+      // Upsert em lote (1 requisição HTTP)
+      const records = batch.map(contactId => ({
+        id: generateId(),
+        contactId,
+        campaignId,
+        currentStepId: firstStep.id,
+        stepStatus: isCampaignActive ? 'QUEUED' : 'PENDING',
+        updatedAt: now,
+      }));
+
+      const { data: inserted, error: upsertError } = await supabase
         .from('CampaignContact')
-        .upsert({
-          id: contactCampaignId,
-          contactId,
-          campaignId,
-          currentStepId: firstStep.id,
-          stepStatus: isCampaignActive ? 'QUEUED' : 'PENDING',
-          updatedAt: new Date().toISOString(),
-        }, { onConflict: 'contactId,campaignId' })
-        .select()
-        .single();
+        .upsert(records, { onConflict: 'contactId,campaignId', ignoreDuplicates: true })
+        .select('id, contactId');
 
-      if (ccError) {
-        console.error('[Diagnostic] Erro ao vincular contato:', ccError);
+      if (upsertError) {
+        console.error('[Batch Upsert] Erro:', upsertError);
         continue;
       }
 
-      // Só envia para o Inngest IMEDIATAMENTE se a campanha estiver ATIVA
-      if (isCampaignActive) {
-        await inngest.send({
-          name: "email/send",
+      // Disparar Inngest em batch se campanha ativa
+      if (isCampaignActive && inserted && inserted.length > 0) {
+        const inngestEvents = inserted.map(cc => ({
+          name: "email/send" as const,
           data: {
-            contactId,
+            contactId: cc.contactId,
             campaignContactId: cc.id,
             subject: firstStep.subject,
             htmlBody: firstStep.htmlBody,
             textBody: firstStep.textBody,
           },
-        });
+        }));
+        await inngest.send(inngestEvents);
       }
     }
 

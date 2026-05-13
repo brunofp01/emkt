@@ -220,11 +220,46 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === 'FAILED' ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'text-surface-500 hover:text-surface-300'}`}>
                 Falha
               </Link>
+
+              {/* Filtro de Campanha */}
+              {campaigns && campaigns.length > 0 && (
+                <div className="ml-2 pl-2 border-l border-surface-800/50">
+                  <select
+                    defaultValue={campaignFilter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      window.location.href = `/queue?status=${statusFilter}&campaign=${val}`;
+                    }}
+                    className="bg-surface-900 border border-surface-800 rounded-lg px-2.5 py-1.5 text-xs text-surface-300 focus:border-primary-500 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Todas as campanhas</option>
+                    {campaigns.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            <Link href="/queue" className="btn btn-secondary text-xs !py-1.5">
-              <RefreshCw className="h-3 w-3" /> Atualizar
-            </Link>
+            <div className="flex items-center gap-2">
+              {counts.failed > 0 && (
+                <form action={async () => {
+                  "use server";
+                  const { supabaseAdmin: sb } = await import("@/shared/lib/supabase");
+                  await sb
+                    .from('CampaignContact')
+                    .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
+                    .in('stepStatus', ['FAILED']);
+                }}>
+                  <button type="submit" className="btn btn-secondary text-xs !py-1.5 !text-red-400 hover:!bg-red-500/10">
+                    <RefreshCw className="h-3 w-3" /> Retry Falhas ({counts.failed})
+                  </button>
+                </form>
+              )}
+              <Link href="/queue" className="btn btn-secondary text-xs !py-1.5">
+                <RefreshCw className="h-3 w-3" /> Atualizar
+              </Link>
+            </div>
           </div>
         </div>
 

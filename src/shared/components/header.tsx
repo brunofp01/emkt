@@ -1,11 +1,12 @@
 /**
- * Header — Premium top bar with clean breadcrumbs.
+ * Header — Premium top bar with breadcrumbs and auth controls.
  */
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, LogOut } from "lucide-react";
 import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
 
 const breadcrumbMap: Record<string, string> = {
   "/": "Dashboard",
@@ -14,6 +15,8 @@ const breadcrumbMap: Record<string, string> = {
   "/analytics": "Analytics",
   "/settings": "Configurações",
   "/settings/providers": "Provedores",
+  "/queue": "Fila de Envio",
+  "/diagnostics": "Diagnóstico",
 };
 
 function getBreadcrumbs(pathname: string) {
@@ -34,8 +37,19 @@ function getBreadcrumbs(pathname: string) {
 
 export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const breadcrumbs = getBreadcrumbs(pathname);
   const pageTitle = breadcrumbs[breadcrumbs.length - 1]?.label;
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-surface-800/40 bg-surface-950/80 px-4 sm:px-6 backdrop-blur-xl">
@@ -78,10 +92,20 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </span>
       </div>
 
-      {/* Right — Status indicator */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-900/60 border border-surface-800/40">
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-dot-pulse" />
-        <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-widest hidden sm:inline">Online</span>
+      {/* Right — Status + Logout */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-900/60 border border-surface-800/40">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-dot-pulse" />
+          <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-widest hidden sm:inline">Online</span>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+          title="Sair"
+          aria-label="Sair"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </header>
   );

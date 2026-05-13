@@ -17,7 +17,7 @@ export async function bulkImportContacts(contacts: ImportContact[], campaignId?:
     if (!contacts.length) return { success: true };
 
     // 1. Preparar dados para o Supabase
-    const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const generateId = () => require('crypto').randomUUID();
     const now = new Date().toISOString();
 
     const dataToInsert = contacts.map((c) => ({

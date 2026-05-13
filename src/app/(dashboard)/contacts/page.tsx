@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getContacts } from "@/features/contacts/lib/queries";
 import { getCampaigns } from "@/features/campaigns/lib/queries";
 import { ContactTable } from "@/features/contacts/components/contact-table";
-import type { ContactStatus } from "@prisma/client";
+import type { ContactStatus } from "@/shared/types";
 
 import { supabaseAdmin } from "@/shared/lib/supabase";
 

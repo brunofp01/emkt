@@ -6,11 +6,15 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 
-  // Email Providers (Pelo menos um deve estar configurado)
+  // Email Providers (pelo menos um deve estar configurado)
   RESEND_API_KEY: z.string().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   BREVO_API_KEY: z.string().optional(),
   MAILGUN_API_KEY: z.string().optional(),
+  MAILRELAY_API_KEY: z.string().optional(),
+  MAILRELAY_SUBDOMAIN: z.string().optional(),
+  GMAIL_USER: z.string().optional(),
+  GMAIL_APP_PASSWORD: z.string().optional(),
 
   // App
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
@@ -25,6 +29,10 @@ const parsed = envSchema.safeParse({
   RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
   BREVO_API_KEY: process.env.BREVO_API_KEY,
   MAILGUN_API_KEY: process.env.MAILGUN_API_KEY,
+  MAILRELAY_API_KEY: process.env.MAILRELAY_API_KEY,
+  MAILRELAY_SUBDOMAIN: process.env.MAILRELAY_SUBDOMAIN,
+  GMAIL_USER: process.env.GMAIL_USER,
+  GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NODE_ENV: process.env.NODE_ENV,
 });
@@ -40,5 +48,11 @@ export const env = parsed.success ? parsed.data : ({} as z.infer<typeof envSchem
  * Helper para verificar se temos algum provedor configurado.
  */
 export const hasProviderConfigured = () => {
-  return !!(env.RESEND_API_KEY || env.BREVO_API_KEY || env.MAILGUN_API_KEY);
+  return !!(
+    env.RESEND_API_KEY || 
+    env.BREVO_API_KEY || 
+    env.MAILGUN_API_KEY || 
+    env.MAILRELAY_API_KEY ||
+    env.GMAIL_USER
+  );
 };

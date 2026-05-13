@@ -13,7 +13,8 @@ import { addContactsToCampaign } from "@/features/campaigns/actions/create-campa
  * Função simples para gerar um ID compatível com o campo String (cuid) do Prisma.
  * Usado para inserções diretas via Supabase SDK.
  */
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+import { randomUUID } from "crypto";
+const generateId = () => randomUUID();
 
 /** Schema de validação para criação de contato */
 const createContactSchema = z.object({

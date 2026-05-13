@@ -5,10 +5,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import { inngest } from "@/shared/lib/inngest";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
-
-const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -41,7 +40,7 @@ export async function GET(req: NextRequest) {
       const updates: any[] = [
         // Registrar evento de clique
         supabaseAdmin.from('EmailEvent').insert({
-          id: generateId(),
+          id: randomUUID(),
           externalId: `click_${campaignContactId}_${Date.now()}`,
           contactId: cc.contactId,
           messageId: cc.lastMessageId || 'direct-click',

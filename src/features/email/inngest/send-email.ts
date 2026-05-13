@@ -77,6 +77,12 @@ export const sendEmail = inngest.createFunction(
 
     if (campaignContact.isPaused) return { skipped: true, reason: "Contact is paused" };
 
+    // Idempotência: se já foi enviado, não reenviar (proteção contra retries do Inngest)
+    const alreadySent = ['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(campaignContact.stepStatus);
+    if (alreadySent) {
+      return { skipped: true, reason: `Already in status ${campaignContact.stepStatus}, skipping duplicate send` };
+    }
+
     // 3. Preparar Renderização (Fora do laço para não repetir trabalho)
     const stepConfig = await step.run("fetch-step-config", async () => {
       if (!campaignContact.currentStepId) return null;
@@ -210,7 +216,7 @@ export const sendEmail = inngest.createFunction(
         await step.run(`pause-blocked-account-${attempt}`, async () => {
           // Registrar falha no evento para visibilidade
           await supabaseAdmin.from('EmailEvent').insert({
-            id: Math.random().toString(36).substring(2, 15),
+            id: require('crypto').randomUUID(),
             externalId: `blocked_${providerId}_${Date.now()}`,
             contactId: contact.id,
             messageId: 'account-blocked',
@@ -261,7 +267,7 @@ export const sendEmail = inngest.createFunction(
 
     // 10. REGISTRAR EVENTOS E CONTADORES (separado para não duplicar status)
     await step.run("record-events", async () => {
-      const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const generateId = () => require('crypto').randomUUID();
       const now = new Date().toISOString();
       const isSMTP = finalProviderConfig?.providerType === 'SMTP';
       

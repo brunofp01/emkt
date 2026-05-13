@@ -1,16 +1,49 @@
 /**
  * Shared types da aplicação.
- * Tipos inferidos do Prisma + tipos auxiliares.
+ * Tipos definidos manualmente — sem dependência do Prisma.
  */
-import type { EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus } from "@prisma/client";
 
-export type { EmailEventType, ContactStatus, CampaignStatus, SequenceStepStatus };
+/** Tipos de evento de email */
+export type EmailEventType = 
+  | "SENT" 
+  | "DELIVERED" 
+  | "OPENED" 
+  | "CLICKED" 
+  | "BOUNCED" 
+  | "BOUNCED_SOFT"
+  | "BOUNCED_HARD"
+  | "COMPLAINED" 
+  | "UNSUBSCRIBED"
+  | "REJECTED"
+  | "DELIVERY_DELAYED"
+  | "FAILED";
+
+/** Status do contato */
+export type ContactStatus = "ACTIVE" | "UNSUBSCRIBED" | "BOUNCED" | "COMPLAINED";
+
+/** Status da campanha */
+export type CampaignStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
+
+/** Status do contato na sequência */
+export type SequenceStepStatus = 
+  | "PENDING" 
+  | "QUEUED" 
+  | "SENDING" 
+  | "SENT" 
+  | "DELIVERED" 
+  | "OPENED" 
+  | "CLICKED" 
+  | "BOUNCED" 
+  | "FAILED"
+  | "COMPLETED";
 
 /** Resultado padronizado de envio de email por qualquer provedor */
 export interface SendEmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  /** Indica que a conta do provedor foi bloqueada (rate limit permanente) */
+  accountBlocked?: boolean;
 }
 
 /** Parâmetros para envio de email (comum a todos os provedores) */
@@ -101,4 +134,23 @@ export interface ProviderStats {
   bounced: number;
   openRate: number;
   clickRate: number;
+}
+
+/** Configuração de provedor (espelho da tabela ProviderConfig) */
+export interface ProviderConfig {
+  id: string;
+  provider: string;
+  providerType: "SMTP" | "API_BREVO" | "API_MAILRELAY" | "API_RESEND" | "API_MAILGUN";
+  fromEmail: string;
+  fromName: string;
+  dailyLimit: number;
+  sentToday: number;
+  weight: number;
+  isActive: boolean;
+  accountTier: "NOVA" | "AQUECIDA" | "VETERANA";
+  warmupStartedAt: string;
+  lastResetAt: string;
+  totalSent: number;
+  totalBounces: number;
+  totalComplaints: number;
 }
