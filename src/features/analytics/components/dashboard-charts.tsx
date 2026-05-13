@@ -123,7 +123,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ funnelData, tr
         </h2>
         {campaignsPerformance.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-surface-800/40 text-[10px] font-bold uppercase tracking-[0.15em] text-surface-600">
                   <th className="py-3 px-3">Campanha</th>

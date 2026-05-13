@@ -152,7 +152,7 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
         </div>
 
         {/* KPI Cards — classes estáticas para o Tailwind purge */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <Link href={`/queue?status=${statusFilter === 'QUEUE' ? 'ALL' : 'QUEUE'}`}
             className={`p-3 rounded-xl border transition-all hover:scale-[1.02] ${statusFilter === 'QUEUE' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-surface-900/30 border-surface-800/30 hover:border-surface-700/50'}`}>
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400">Na Fila</p>

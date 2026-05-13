@@ -17,7 +17,7 @@ export default function DashboardLayout({
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-950">
+    <div className="flex min-h-dvh flex-col bg-surface-950 overflow-x-hidden">
       <Sidebar 
         isOpen={isMobileSidebarOpen} 
         onClose={() => setIsMobileSidebarOpen(false)}
@@ -27,11 +27,11 @@ export default function DashboardLayout({
 
       {/* Main content area */}
       <div className={cn(
-        "flex flex-1 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] min-w-0 w-full",
+        "flex flex-1 flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] min-w-0 w-full overflow-x-hidden",
         isCollapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"
       )}>
         <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 mx-auto w-full max-w-screen-xl">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 w-full max-w-full">{children}</main>
       </div>
     </div>
   );
