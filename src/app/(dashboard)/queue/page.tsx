@@ -5,6 +5,8 @@
 import { supabaseAdmin } from "@/shared/lib/supabase";
 import Link from "next/link";
 import { Mail, RefreshCw, Filter, SendHorizonal, Clock } from "lucide-react";
+import { CampaignFilterSelect } from "./campaign-filter";
+import { retryFailedEmails } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -221,36 +223,19 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
                 Falha
               </Link>
 
-              {/* Filtro de Campanha */}
+              {/* Filtro de Campanha (Client Component) */}
               {campaigns && campaigns.length > 0 && (
-                <div className="ml-2 pl-2 border-l border-surface-800/50">
-                  <select
-                    defaultValue={campaignFilter}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      window.location.href = `/queue?status=${statusFilter}&campaign=${val}`;
-                    }}
-                    className="bg-surface-900 border border-surface-800 rounded-lg px-2.5 py-1.5 text-xs text-surface-300 focus:border-primary-500 outline-none cursor-pointer"
-                  >
-                    <option value="ALL">Todas as campanhas</option>
-                    {campaigns.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <CampaignFilterSelect
+                  campaigns={campaigns.map((c: any) => ({ id: c.id, name: c.name }))}
+                  currentStatus={statusFilter}
+                  currentCampaign={campaignFilter}
+                />
               )}
             </div>
 
             <div className="flex items-center gap-2">
               {counts.failed > 0 && (
-                <form action={async () => {
-                  "use server";
-                  const { supabaseAdmin: sb } = await import("@/shared/lib/supabase");
-                  await sb
-                    .from('CampaignContact')
-                    .update({ stepStatus: 'QUEUED', updatedAt: new Date().toISOString() })
-                    .in('stepStatus', ['FAILED']);
-                }}>
+                <form action={retryFailedEmails}>
                   <button type="submit" className="btn btn-secondary text-xs !py-1.5 !text-red-400 hover:!bg-red-500/10">
                     <RefreshCw className="h-3 w-3" /> Retry Falhas ({counts.failed})
                   </button>
