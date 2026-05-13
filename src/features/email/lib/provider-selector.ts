@@ -87,19 +87,17 @@ export async function selectProviderForSend(): Promise<{
   }
 
   if (available.length === 0) {
-    // Nenhum provedor com capacidade — usar o primeiro como fallback
-    console.warn("[ProviderSelector] Todos os provedores atingiram o limite diário.");
-    const fallback = configs[0];
-    return { providerId: fallback.provider, providerConfig: fallback };
+    // Nenhum provedor com capacidade — lançar erro para Inngest reagendar
+    // NUNCA forçar envio além do limite (causa bloqueio de conta)
+    throw new Error("ALL_PROVIDERS_EXHAUSTED: Todos os provedores atingiram o limite diário. Inngest vai reagendar automaticamente.");
   }
 
-  // Seleção EQUALITÁRIA (1 por 1): 
-  // Escolhemos aleatoriamente entre todos os que têm capacidade.
-  // Isso garante que, estatisticamente, todos enviem o mesmo volume.
-  const idx = Math.floor(Math.random() * available.length);
-  const selected = available[idx];
+  // Round-robin DETERMINÍSTICO: selecionar o provedor com menor sentToday
+  // Garante distribuição perfeitamente igual (1:1:1) entre provedores
+  available.sort((a, b) => (a.sentToday || 0) - (b.sentToday || 0));
+  const selected = available[0];
   
-  console.log(`[ProviderSelector] Seleção Igualitária: ${selected.provider} (${available.length} disponíveis)`);
+  console.log(`[ProviderSelector] Round-robin: ${selected.provider} (sentToday=${selected.sentToday}, ${available.length} disponíveis)`);
   return { providerId: selected.provider, providerConfig: selected };
 }
 

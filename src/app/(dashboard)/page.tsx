@@ -263,7 +263,7 @@ export default async function DashboardPage() {
         <p className="mt-2 max-w-md text-surface-400 text-sm">
           Não conseguimos carregar estas informações agora. Isso pode ser uma falha temporária de conexão.
         </p>
-        <div className="mt-4 text-[10px] text-surface-600 font-mono">ID do Erro: {Math.floor(Math.random() * 9999999999)}</div>
+        <div className="mt-4 text-[10px] text-surface-600 font-mono">Erro interno do dashboard</div>
       </div>
     );
   }

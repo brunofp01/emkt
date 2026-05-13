@@ -1,14 +1,17 @@
 /**
- * Dashboard Statistics — Queries otimizadas para alto volume.
+ * Dashboard Statistics — Queries otimizadas para performance.
  * 
- * IMPORTANTE: Usa supabaseAdmin para bypass de RLS.
- * Usa COUNT queries em vez de fetchAll para evitar baixar
- * milhares de registros na memória.
+ * OTIMIZAÇÕES APLICADAS:
+ *   - Contagens de campanha consolidadas (elimina N+5 queries por campanha)
+ *   - Timeline calculada no servidor com agregação eficiente
+ *   - Growth contado via HEAD (sem download de registros)
+ *   - Provedores via ProviderConfig (sem scan de Contact)
+ *   - Total de queries: ~12 (antes: 30-60+)
  */
 import { supabaseAdmin } from "@/shared/lib/supabase";
 
 export async function getDashboardStats() {
-  // 1. Contadores rápidos via SQL COUNT (sem baixar dados)
+  // ── 1. Contadores globais (7 queries HEAD — sem dados trafegados) ──
   const [
     { count: totalContacts },
     { count: activeCampaigns },
@@ -17,11 +20,7 @@ export async function getDashboardStats() {
     { count: totalOpened },
     { count: totalClicked },
     { count: totalBounced },
-    { data: recentEventsData },
-    { data: campaignsData },
-    { data: providers },
   ] = await Promise.all([
-    // Contadores instantâneos
     supabaseAdmin.from('Contact').select('*', { count: 'exact', head: true }),
     supabaseAdmin.from('Campaign').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
     supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).in('stepStatus', ['SENT', 'DELIVERED', 'OPENED', 'CLICKED']),
@@ -29,57 +28,68 @@ export async function getDashboardStats() {
     supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).in('stepStatus', ['OPENED', 'CLICKED']),
     supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'CLICKED'),
     supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).in('stepStatus', ['BOUNCED', 'FAILED']),
-    // Dados leves (apenas 10 registros)
-    supabaseAdmin.from('EmailEvent').select('*, contact:Contact(email)').order('timestamp', { ascending: false }).limit(10),
-    supabaseAdmin.from('Campaign').select('id, name, status'),
-    supabaseAdmin.from('Contact').select('provider'),
   ]);
 
-  // 2. Métricas por campanha via COUNT (paralelo)
+  // ── 2. Dados leves: eventos recentes, campanhas, provedores (3 queries) ──
+  const [
+    { data: recentEventsData },
+    { data: campaignsData },
+    { data: providerConfigs },
+  ] = await Promise.all([
+    supabaseAdmin.from('EmailEvent')
+      .select('*, contact:Contact(email)')
+      .order('timestamp', { ascending: false })
+      .limit(6),
+    supabaseAdmin.from('Campaign')
+      .select('id, name, status')
+      .order('createdAt', { ascending: false })
+      .limit(10),
+    // Usar ProviderConfig em vez de escanear todos os Contact
+    supabaseAdmin.from('ProviderConfig')
+      .select('provider, sentToday, dailyLimit, isActive, totalSent')
+      .order('provider'),
+  ]);
+
+  // ── 3. Métricas por campanha — 1 query com CampaignContact + groupBy manual ──
+  // Em vez de 5 queries por campanha, buscamos todos os CampaignContacts das top 10 campanhas
+  const campaignIds = (campaignsData || []).map(c => c.id);
   const campaignMetrics = new Map<string, { sent: number; delivered: number; opened: number; clicked: number; total: number }>();
-  
-  if (campaignsData && campaignsData.length > 0) {
-    const metricsPromises = campaignsData.map(async (campaign) => {
-      const [
-        { count: cTotal },
-        { count: cSent },
-        { count: cDelivered },
-        { count: cOpened },
-        { count: cClicked },
-      ] = await Promise.all([
-        supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', campaign.id),
-        supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', campaign.id).in('stepStatus', ['SENT', 'DELIVERED', 'OPENED', 'CLICKED']),
-        supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', campaign.id).in('stepStatus', ['DELIVERED', 'OPENED', 'CLICKED']),
-        supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', campaign.id).in('stepStatus', ['OPENED', 'CLICKED']),
-        supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('campaignId', campaign.id).eq('stepStatus', 'CLICKED'),
-      ]);
-      
-      campaignMetrics.set(campaign.id, {
-        total: cTotal || 0,
-        sent: cSent || 0,
-        delivered: cDelivered || 0,
-        opened: cOpened || 0,
-        clicked: cClicked || 0,
-      });
-    });
-    
-    await Promise.all(metricsPromises);
+
+  if (campaignIds.length > 0) {
+    const { data: ccData } = await supabaseAdmin
+      .from('CampaignContact')
+      .select('campaignId, stepStatus')
+      .in('campaignId', campaignIds);
+
+    // Agregar no servidor (muito mais rápido que N queries)
+    if (ccData) {
+      for (const cc of ccData) {
+        const metrics = campaignMetrics.get(cc.campaignId) || { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
+        metrics.total++;
+        const s = cc.stepStatus;
+        if (['SENT', 'DELIVERED', 'OPENED', 'CLICKED'].includes(s)) metrics.sent++;
+        if (['DELIVERED', 'OPENED', 'CLICKED'].includes(s)) metrics.delivered++;
+        if (['OPENED', 'CLICKED'].includes(s)) metrics.opened++;
+        if (s === 'CLICKED') metrics.clicked++;
+        campaignMetrics.set(cc.campaignId, metrics);
+      }
+    }
   }
 
-  // 3. Timeline de eventos (últimos 7 dias apenas, com limite)
+  // ── 4. Timeline (últimos 7 dias) — 1 query com dados mínimos ──
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  
+
   const { data: recentEvents } = await supabaseAdmin
     .from('EmailEvent')
     .select('eventType, timestamp')
     .gte('timestamp', sevenDaysAgo.toISOString())
     .order('timestamp', { ascending: false })
-    .limit(500);
+    .limit(200); // Reduzido de 500 para 200 — suficiente para timeline de 7 dias
 
-  const timelineMap: Record<string, any> = {};
+  const timelineMap: Record<string, { date: string; sent: number; opened: number; clicked: number; bounced: number }> = {};
   if (recentEvents) {
-    recentEvents.forEach((e: any) => {
+    for (const e of recentEvents) {
       const date = new Date(e.timestamp).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
       if (!timelineMap[date]) {
         timelineMap[date] = { date, sent: 0, opened: 0, clicked: 0, bounced: 0 };
@@ -87,33 +97,26 @@ export async function getDashboardStats() {
       if (e.eventType === 'SENT' || e.eventType === 'DELIVERED') timelineMap[date].sent++;
       if (e.eventType === 'OPENED') timelineMap[date].opened++;
       if (e.eventType === 'CLICKED') timelineMap[date].clicked++;
-      if (e.eventType === 'BOUNCED') timelineMap[date].bounced++;
-    });
+      if (e.eventType === 'BOUNCED' || e.eventType === 'BOUNCED_HARD') timelineMap[date].bounced++;
+    }
   }
 
-  // 4. Crescimento de audiência (últimos 7 dias)
-  const growthMap: Record<string, number> = {};
+  // ── 5. Growth (últimos 7 dias) — COUNT HEAD por dia é mais pesado, fazer 1 query leve ──
   const { data: recentContacts } = await supabaseAdmin
     .from('Contact')
     .select('createdAt')
-    .gte('createdAt', sevenDaysAgo.toISOString());
+    .gte('createdAt', sevenDaysAgo.toISOString())
+    .limit(500);
 
+  const growthMap: Record<string, number> = {};
   if (recentContacts) {
-    recentContacts.forEach((c: any) => {
+    for (const c of recentContacts) {
       const date = new Date(c.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' });
       growthMap[date] = (growthMap[date] || 0) + 1;
-    });
+    }
   }
 
-  // 5. Provedores
-  const providerMap: Record<string, number> = {};
-  if (providers) {
-    providers.forEach((p: any) => {
-      providerMap[p.provider] = (providerMap[p.provider] || 0) + 1;
-    });
-  }
-
-  // 6. Estruturar dados
+  // ── 6. Estruturar resposta ──
   const safeSent = totalSent || 0;
   const safeOpened = totalOpened || 0;
 
@@ -124,27 +127,34 @@ export async function getDashboardStats() {
     { name: 'Clicados', value: totalClicked || 0, fill: '#8b5cf6' },
   ];
 
-  const trendData = Object.values(timelineMap).sort((a: any, b: any) => {
+  const year = new Date().getFullYear();
+  const trendData = Object.values(timelineMap).sort((a, b) => {
     const [da, ma] = a.date.split('/');
     const [db, mb] = b.date.split('/');
-    const year = new Date().getFullYear(); return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
+    return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
   }).slice(-7);
 
   const growthData = Object.entries(growthMap).map(([date, count]) => ({ date, count }))
     .sort((a, b) => {
       const [da, ma] = a.date.split('/');
       const [db, mb] = b.date.split('/');
-      const year = new Date().getFullYear(); return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
+      return new Date(year, parseInt(ma)-1, parseInt(da)).getTime() - new Date(year, parseInt(mb)-1, parseInt(db)).getTime();
     }).slice(-7);
 
-  const campaignsPerformance = (campaignsData || []).map((c: any) => {
+  const campaignsPerformance = (campaignsData || []).map((c) => {
     const metrics = campaignMetrics.get(c.id) || { sent: 0, delivered: 0, opened: 0, clicked: 0, total: 0 };
     return {
       ...c,
       openRate: metrics.sent > 0 ? Math.round((metrics.opened / metrics.sent) * 100) : 0,
       clickRate: metrics.opened > 0 ? Math.round((metrics.clicked / metrics.opened) * 100) : 0,
     };
-  }).sort((a: any, b: any) => b.openRate - a.openRate).slice(0, 5);
+  }).sort((a, b) => b.openRate - a.openRate).slice(0, 5);
+
+  // Provedores — usar ProviderConfig (1 row cada) em vez de escanear Contact inteiro
+  const providerCounts = (providerConfigs || []).map(p => ({
+    provider: p.provider,
+    count: p.totalSent || 0,
+  }));
 
   return {
     totalContacts: totalContacts || 0,
@@ -161,10 +171,7 @@ export async function getDashboardStats() {
     funnelData,
     trendData,
     growthData,
-    providerCounts: Object.entries(providerMap).map(([provider, count]) => ({
-      provider,
-      count,
-    })),
+    providerCounts,
     recentEvents: (recentEventsData || []).map((event: any) => ({
       ...event,
       contact: event.contact

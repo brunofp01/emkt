@@ -101,37 +101,26 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
       currentStep: stepMap.get(item.currentStepId) || null,
     }));
 
-    // Contagens globais por status (via COUNT — sem limite de 1000)
-    const [
-      { count: cQueued },
-      { count: cSending },
-      { count: cSent },
-      { count: cDelivered },
-      { count: cOpened },
-      { count: cClicked },
-      { count: cFailed },
-      { count: cTotal },
-    ] = await Promise.all([
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).in('stepStatus', ['PENDING', 'QUEUED']),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'SENDING'),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'SENT'),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'DELIVERED'),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'OPENED'),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).eq('stepStatus', 'CLICKED'),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }).in('stepStatus', ['BOUNCED', 'FAILED']),
-      supabaseAdmin.from('CampaignContact').select('*', { count: 'exact', head: true }),
-    ]);
+    // Contagens globais — 1 query busca todos stepStatus, agrega no servidor
+    // (elimina 8 round-trips separados ao Supabase)
+    const { data: allStatuses } = await supabaseAdmin
+      .from('CampaignContact')
+      .select('stepStatus');
 
-    const counts = {
-      queued: cQueued || 0,
-      sending: cSending || 0,
-      sent: cSent || 0,
-      delivered: cDelivered || 0,
-      opened: cOpened || 0,
-      clicked: cClicked || 0,
-      failed: cFailed || 0,
-      total: cTotal || 0,
-    };
+    const counts = { queued: 0, sending: 0, sent: 0, delivered: 0, opened: 0, clicked: 0, failed: 0, total: 0 };
+    if (allStatuses) {
+      for (const row of allStatuses) {
+        counts.total++;
+        const s = row.stepStatus;
+        if (s === 'PENDING' || s === 'QUEUED') counts.queued++;
+        else if (s === 'SENDING') counts.sending++;
+        else if (s === 'SENT') counts.sent++;
+        else if (s === 'DELIVERED') counts.delivered++;
+        else if (s === 'OPENED') counts.opened++;
+        else if (s === 'CLICKED') counts.clicked++;
+        else if (s === 'BOUNCED' || s === 'FAILED') counts.failed++;
+      }
+    }
 
     const totalPages = Math.ceil((totalCount || 0) / perPage);
 
