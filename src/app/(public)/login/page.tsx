@@ -44,8 +44,8 @@ function LoginForm() {
         return;
       }
 
-      router.push(redirect);
-      router.refresh();
+      // Redirecionamento robusto (hard reload) para garantir sincronia de cookies
+      window.location.href = redirect;
     } catch (err: any) {
       setError("Erro de conexão. Tente novamente.");
     } finally {
