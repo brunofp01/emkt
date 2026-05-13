@@ -169,7 +169,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   </button>
                 </form>
               )}
-              <Link href={`/campaigns/${campaign.id}/analytics`} className="btn btn-secondary text-xs flex-1 sm:flex-none">
+              <Link href={`/?campaign=${campaign.id}`} className="btn btn-secondary text-xs flex-1 sm:flex-none">
                 <BarChart3 className="h-3.5 w-3.5" /> Analytics
               </Link>
               <Link href={`/campaigns/${campaign.id}/edit`} className="btn btn-primary !bg-surface-800 !text-surface-100 hover:!bg-surface-700 !border-surface-700 text-xs flex-1 sm:flex-none">
