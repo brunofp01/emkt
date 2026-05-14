@@ -23,12 +23,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Buscar contatos QUEUED (lote de 20)
+    // 2. Buscar contatos QUEUED (lote de 100 para maior vazão)
     const { data: contacts, error: fetchError } = await supabaseAdmin
       .from("CampaignContact")
       .select("id, contactId, currentStepId, campaignId")
       .eq("stepStatus", "QUEUED")
-      .limit(20);
+      .limit(100);
 
     if (fetchError) throw fetchError;
 
