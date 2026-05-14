@@ -11,7 +11,10 @@ export const cronProcessQueue = inngest.createFunction(
   { 
     id: "cron-process-queue", 
     name: "Cron — Process Email Queue",
-    triggers: [{ cron: "* * * * *" }]
+    triggers: [
+      { cron: "* * * * *" },
+      { event: "email/cron-process-queue" }
+    ]
   },
   async ({ step }) => {
     // 1. Buscar contatos QUEUED (lote de 100)
