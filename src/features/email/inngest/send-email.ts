@@ -32,6 +32,10 @@ export const sendEmail = inngest.createFunction(
     id: "send-email-v2",
     name: "Send Email via Provider Rotation",
     retries: 3,
+    concurrency: {
+      limit: 2,
+      key: "event.data.providerId || 'global-send'"
+    },
     triggers: [{ event: "email/send" }],
   },
   async ({ event, step }) => {
@@ -186,9 +190,8 @@ export const sendEmail = inngest.createFunction(
       const { providerId, providerConfig, accountTier } = providerResult as any;
       logger.info(`[Roleta - Tentativa ${attempt}/${maxAttempts}] Email para ${contact.email} → Provedor: ${providerId}`);
 
-      // Warmup delay (desativado temporariamente para acelerar despacho inicial)
-      // const delaySec = getSendDelay(accountTier as AccountTier);
-      // await step.sleep(`warmup-send-delay-${attempt}`, `${delaySec}s`);
+      // Warmup delay (reativado para evitar rate limit do Mailrelay)
+      await step.sleep(`rate-limit-delay-${attempt}`, `1s`);
 
       const result = await step.run(`send-via-provider-${attempt}`, async () => {
         const provider = await getEmailProvider(providerId);
