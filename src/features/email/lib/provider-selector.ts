@@ -87,8 +87,10 @@ export async function selectProviderForSend(): Promise<{
   }
 
   if (available.length === 0) {
-    // Nenhum provedor com capacidade — lançar erro para Inngest reagendar
-    // NUNCA forçar envio além do limite (causa bloqueio de conta)
+    console.log(`[ProviderSelector] NENHUM PROVEDOR DISPONÍVEL! Total configs: ${configs.length}`);
+    configs.forEach(c => {
+      console.log(`  - ${c.provider}: isActive=${c.isActive}, sentToday=${c.sentToday}, limit=${c.dailyLimit}, tier=${c.accountTier}`);
+    });
     throw new Error("ALL_PROVIDERS_EXHAUSTED: Todos os provedores atingiram o limite diário. Inngest vai reagendar automaticamente.");
   }
 
