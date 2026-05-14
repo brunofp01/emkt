@@ -27,9 +27,11 @@ import {
 const BASE_URL = env.NEXT_PUBLIC_APP_URL;
 const generateId = () => randomUUID();
 
+console.log(">>> [Inngest] Loading send-email.ts v3");
+
 export const sendEmail = inngest.createFunction(
   {
-    id: "send-email-v3",
+    id: "send-email-v5",
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
@@ -193,7 +195,7 @@ export const sendEmail = inngest.createFunction(
       // Warmup delay (reativado para evitar rate limit do Mailrelay)
       await step.sleep(`rate-limit-delay-${attempt}`, `1s`);
 
-      const result = await step.run(`send-via-provider-${attempt}`, async () => {
+      const result = await step.run(`send-via-provider-v5-${attempt}`, async () => {
         logger.info(`[Provider] Iniciando envio via ${providerId} para ${contact.email}...`);
         const provider = await getEmailProvider(providerId);
         const sendResult = await provider.send({
