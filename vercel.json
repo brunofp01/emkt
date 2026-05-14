@@ -1,2 +1,12 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/process-queue",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/reset-counters",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
