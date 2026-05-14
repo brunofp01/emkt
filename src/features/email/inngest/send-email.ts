@@ -64,7 +64,9 @@ export const sendEmail = inngest.createFunction(
 
     if ((contact as any).skipped) return contact;
 
-    // 2. Buscar CampaignContact para verificar estado
+    // DIAGNÓSTICO: Registrar início imediato da execução
+    console.log(`[Inngest] Iniciando processamento para CC: ${campaignContactId}`);
+
     const campaignContact = await step.run("fetch-campaign-contact", async () => {
       const { data, error } = await supabaseAdmin
         .from('CampaignContact')

@@ -6,8 +6,9 @@ import { serve } from "inngest/next";
 import { inngest } from "@/shared/lib/inngest";
 import { sendEmail } from "@/features/email/inngest/send-email";
 import { processSequence } from "@/features/email/inngest/process-sequence";
+import { sendEmailTest } from "@/features/email/inngest/send-email-test";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [sendEmail, processSequence],
+  functions: [sendEmail, processSequence, sendEmailTest],
 });
