@@ -67,6 +67,10 @@ export async function selectProviderForSend(): Promise<{
   const available: typeof configs = [];
 
   for (const config of configs) {
+    if (config.pausedUntil && new Date(config.pausedUntil) > now) {
+      continue; // Pula provedores que estão em período de Cooldown
+    }
+
     const lastReset = new Date(config.lastResetAt);
     const isNewDay = now.toDateString() !== lastReset.toDateString();
     

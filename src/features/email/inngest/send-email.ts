@@ -29,14 +29,14 @@ const generateId = () => randomUUID();
 
 export const sendEmail = inngest.createFunction(
   {
-    id: "send-email-v20",
+    id: "send-email-v21",
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
       limit: 5,
       key: "event.data.providerId || 'global-send'"
     },
-    triggers: [{ event: "email/send-v20" }],
+    triggers: [{ event: "email/send-v21" }],
   },
   async ({ event, step }) => {
     const { contactId, campaignContactId, subject, htmlBody, textBody } = event.data as {
@@ -141,7 +141,17 @@ export const sendEmail = inngest.createFunction(
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const providerResult = await step.run(`select-and-validate-provider-v2-${attempt}`, async () => {
-        const { providerId, providerConfig } = await selectProviderForSend();
+        let providerId, providerConfig;
+        try {
+          const result = await selectProviderForSend();
+          providerId = result.providerId;
+          providerConfig = result.providerConfig;
+        } catch (error: any) {
+          if (error.message.includes('ALL_PROVIDERS_EXHAUSTED')) {
+            return { ok: false, reason: "all_exhausted" };
+          }
+          throw error;
+        }
         const accountTier = await checkAndUpdateTier(providerId);
         
         const healthCheck = shouldDeactivateAccount(
@@ -183,6 +193,10 @@ export const sendEmail = inngest.createFunction(
            const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0); 
            await step.sleepUntil("wait-for-daily-reset", tomorrow);
            throw new Error("Limites diários esgotados de todas as contas. O sistema vai dormir até a meia-noite.");
+        }
+        if ((providerResult as any).reason === "all_exhausted") {
+           await step.sleep(`wait-for-cooldown-${attempt}`, "30m");
+           throw new Error("Todos os provedores estão em Cooldown ou Esgotados. Dormindo 30m antes de tentar novamente.");
         }
         continue;
       }
@@ -246,8 +260,9 @@ export const sendEmail = inngest.createFunction(
             metadata: { error: result.error, isBlocked: true }
           });
 
-          // await supabaseAdmin.from('ProviderConfig').update({ sentToday: 99999, updatedAt: new Date().toISOString() }).eq('provider', providerId);
-          logger.error(`[AccountBlocked] Erro crítico via ${providerId} (Attempt ${attempt}). Tentando próxima conta...`);
+          const pausedUntil = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+          await supabaseAdmin.from('ProviderConfig').update({ pausedUntil, updatedAt: new Date().toISOString() }).eq('provider', providerId);
+          logger.error(`[AccountBlocked] Limite/Erro crítico via ${providerId} (Attempt ${attempt}). Conta pausada por 4 horas na roleta.`);
         });
         continue; // Pula para a próxima conta na roleta!
       }
