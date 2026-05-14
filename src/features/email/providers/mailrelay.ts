@@ -57,15 +57,16 @@ export function createMailrelayProvider(
           payload.reply_to = { email: params.replyTo };
         }
 
-        // Headers customizados para conformidade RFC 8058
-        const customHeaders: Record<string, string> = {};
-        if (params.unsubscribeUrl) {
-          customHeaders["List-Unsubscribe"] = `<${params.unsubscribeUrl}>`;
-          customHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
-        }
-        if (Object.keys(customHeaders).length > 0) {
-          payload.headers = customHeaders;
-        }
+        // Headers customizados para conformidade RFC 8058 (Mailrelay não permite List-Unsubscribe manual)
+        // const customHeaders: Record<string, string> = {};
+        // if (params.unsubscribeUrl) {
+        //   customHeaders["List-Unsubscribe"] = `<${params.unsubscribeUrl}>`;
+        //   customHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+        // }
+        // if (Object.keys(customHeaders).length > 0) {
+        //   payload.headers = customHeaders;
+        // }
+
 
         const response = await fetch(`${baseUrl}/send_emails`, {
           method: "POST",

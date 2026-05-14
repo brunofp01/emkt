@@ -23,7 +23,7 @@ function log(level: LogLevel, payload: LogPayload) {
     message,
     ...context,
     ...(error && { 
-      error: {
+      error: typeof error === 'string' ? error : {
         message: error.message,
         stack: isProd ? undefined : error.stack,
         code: error.code
