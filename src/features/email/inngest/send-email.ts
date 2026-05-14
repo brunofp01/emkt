@@ -29,14 +29,14 @@ const generateId = () => randomUUID();
 
 export const sendEmail = inngest.createFunction(
   {
-    id: "send-email-v10",
+    id: "send-email-v20",
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
       limit: 5,
       key: "event.data.providerId || 'global-send'"
     },
-    triggers: [{ event: "email/send-v10" }],
+    triggers: [{ event: "email/send-v20" }],
   },
   async ({ event, step }) => {
     const { contactId, campaignContactId, subject, htmlBody, textBody } = event.data as {
@@ -193,8 +193,13 @@ export const sendEmail = inngest.createFunction(
       // Warmup delay (reativado para evitar rate limit do Mailrelay)
       await step.sleep(`rate-limit-delay-${attempt}`, `1s`);
 
-      const result = await step.run(`send-via-provider-v10-${attempt}`, async () => {
+      const result = await step.run(`send-via-provider-v20-${attempt}`, async () => {
         logger.info(`[Provider] Iniciando envio via ${providerId} para ${contact.email}...`);
+        console.log(">>> [Mailrelay] Payload:", JSON.stringify({
+          to: contact.email,
+          subject: renderedSubject,
+          html: trackedHtml
+        }));
         const provider = await getEmailProvider(providerId);
         const sendResult = await provider.send({
           to: contact.email, 
@@ -241,8 +246,8 @@ export const sendEmail = inngest.createFunction(
             metadata: { error: result.error, isBlocked: true }
           });
 
-          await supabaseAdmin.from('ProviderConfig').update({ sentToday: 99999, updatedAt: new Date().toISOString() }).eq('provider', providerId);
-          logger.error(`[AccountBlocked] Conta ${providerId} bloqueou no limite (Attempt ${attempt}). Pausando e tentando próxima...`);
+          // await supabaseAdmin.from('ProviderConfig').update({ sentToday: 99999, updatedAt: new Date().toISOString() }).eq('provider', providerId);
+          logger.error(`[AccountBlocked] Erro crítico via ${providerId} (Attempt ${attempt}). Tentando próxima conta...`);
         });
         continue; // Pula para a próxima conta na roleta!
       }

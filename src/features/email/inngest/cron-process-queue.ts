@@ -46,7 +46,7 @@ export const cronProcessQueue = inngest.createFunction(
       .map(cc => {
         const step = stepMap.get(cc.currentStepId)!;
         return {
-          name: "email/send-v10" as const,
+          name: "email/send-v20" as const,
           data: {
             contactId: cc.contactId,
             campaignContactId: cc.id,

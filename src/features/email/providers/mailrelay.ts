@@ -45,6 +45,8 @@ export function createMailrelayProvider(
           text_part: textContent
         };
 
+        console.log(">>> [Mailrelay] RAW Payload:", JSON.stringify(payload));
+        
         const response = await fetch(`${baseUrl}/send_emails`, {
           method: "POST",
           headers: {
