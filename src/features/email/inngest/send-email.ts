@@ -207,7 +207,7 @@ export const sendEmail = inngest.createFunction(
           unsubscribeUrl, 
           contactId: contact.id
         });
-        logger.info(`[Provider] Resultado do envio: ${sendResult.success ? 'Sucesso' : 'Falha'}`);
+        logger.info(`[Provider] Resultado do envio: ${sendResult.success ? 'Sucesso' : 'Falha'}. Erro: ${sendResult.error || 'Nenhum'}`);
         return sendResult;
       });
 
