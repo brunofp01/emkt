@@ -9,4 +9,5 @@ import { Inngest } from "inngest";
 export const inngest = new Inngest({
   id: "email-marketing-platform",
   name: "Email Marketing Platform",
+  eventKey: process.env.INNGEST_EVENT_KEY,
 });

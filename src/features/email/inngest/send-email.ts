@@ -14,6 +14,7 @@ import { selectProviderForSend } from "@/features/email/lib/provider-selector";
 import { rewriteLinks } from "@/features/email/lib/link-tracker";
 import { env } from "@/shared/lib/env";
 import { logger } from "@/shared/lib/logger";
+import { randomUUID } from "crypto";
 import { 
   getSendDelay, 
   getEffectiveDailyLimit, 
@@ -216,7 +217,7 @@ export const sendEmail = inngest.createFunction(
         await step.run(`pause-blocked-account-${attempt}`, async () => {
           // Registrar falha no evento para visibilidade
           await supabaseAdmin.from('EmailEvent').insert({
-            id: require('crypto').randomUUID(),
+            id: randomUUID(),
             externalId: `blocked_${providerId}_${Date.now()}`,
             contactId: contact.id,
             messageId: 'account-blocked',
@@ -267,14 +268,13 @@ export const sendEmail = inngest.createFunction(
 
     // 10. REGISTRAR EVENTOS E CONTADORES (separado para não duplicar status)
     await step.run("record-events", async () => {
-      const generateId = () => require('crypto').randomUUID();
       const now = new Date().toISOString();
       const isSMTP = finalProviderConfig?.providerType === 'SMTP';
       
       const promises: PromiseLike<any>[] = [
         // Registrar evento SENT
         supabaseAdmin.from('EmailEvent').insert({
-          id: generateId(),
+          id: randomUUID(),
           externalId: finalMessageId || `sent_${campaignContactId}_${Date.now()}`,
           contactId: contact.id,
           messageId: finalMessageId || 'direct-send',
