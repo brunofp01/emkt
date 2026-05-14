@@ -29,6 +29,13 @@ export async function setupDefaultProviders() {
       fromName: 'MailPulse Mailgun',
       weight: 0,
       isActive: false,
+    },
+    {
+      provider: 'MAILRELAY',
+      fromEmail: 'brunofernandes@closerimobiliario.com.br',
+      fromName: 'Bruno Fernandes',
+      weight: 100,
+      isActive: true,
     }
   ];
 
