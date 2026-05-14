@@ -8,8 +8,11 @@ import { supabaseAdmin } from "@/shared/lib/supabase";
  * a fila de emails a cada minuto.
  */
 export const cronProcessQueue = inngest.createFunction(
-  { id: "cron-process-queue", name: "Cron — Process Email Queue" },
-  { cron: "* * * * *" }, // Inngest permite 1 minuto no plano Free
+  { 
+    id: "cron-process-queue", 
+    name: "Cron — Process Email Queue",
+    triggers: [{ cron: "* * * * *" }]
+  },
   async ({ step }) => {
     // 1. Buscar contatos QUEUED (lote de 100)
     const contacts = await step.run("fetch-queued-contacts", async () => {

@@ -25,6 +25,7 @@ import {
 } from "@/features/email/lib/warmup-engine";
 
 const BASE_URL = env.NEXT_PUBLIC_APP_URL;
+const generateId = () => randomUUID();
 
 export const sendEmail = inngest.createFunction(
   {
@@ -203,7 +204,7 @@ export const sendEmail = inngest.createFunction(
         finalProviderConfig = providerConfig;
         finalMessageId = result.messageId || null;
         finalAccountTier = accountTier;
-        finalDelaySec = delaySec;
+        // finalDelaySec = delaySec;
         break; // Entregue com sucesso! Interrompe o loop.
       }
 

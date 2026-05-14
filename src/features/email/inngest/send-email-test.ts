@@ -2,8 +2,11 @@ import { inngest } from "@/shared/lib/inngest";
 import { supabaseAdmin } from "@/shared/lib/supabase";
 
 export const sendEmailTest = inngest.createFunction(
-  { id: "send-email-test", name: "TEST — Fast Send" },
-  { event: "email/test" },
+  { 
+    id: "send-email-test", 
+    name: "TEST — Fast Send",
+    triggers: [{ event: "email/test" }]
+  },
   async ({ event, step }) => {
     const { campaignContactId } = event.data;
     
