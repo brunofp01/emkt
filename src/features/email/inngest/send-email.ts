@@ -29,7 +29,7 @@ const generateId = () => randomUUID();
 
 export const sendEmail = inngest.createFunction(
   {
-    id: "send-email-v2",
+    id: "send-email-v3",
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
