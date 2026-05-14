@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   "/api/cron",
   "/api/inngest",
   "/api/test-inngest",
+  "/api/debug-env",
   "/_next",
   "/favicon.ico",
 ];
