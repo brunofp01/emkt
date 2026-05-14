@@ -33,7 +33,7 @@ export const sendEmail = inngest.createFunction(
     name: "Send Email via Provider Rotation",
     retries: 3,
     concurrency: {
-      limit: 2,
+      limit: 5,
       key: "event.data.providerId || 'global-send'"
     },
     triggers: [{ event: "email/send" }],
@@ -194,11 +194,21 @@ export const sendEmail = inngest.createFunction(
       await step.sleep(`rate-limit-delay-${attempt}`, `1s`);
 
       const result = await step.run(`send-via-provider-${attempt}`, async () => {
+        logger.info(`[Provider] Iniciando envio via ${providerId} para ${contact.email}...`);
         const provider = await getEmailProvider(providerId);
-        return provider.send({
-          to: contact.email, from: providerConfig.fromEmail, fromName: providerConfig.fromName,
-          subject: renderedSubject, html: trackedHtml, text: textBody, replyTo: providerConfig.fromEmail, unsubscribeUrl, contactId: contact.id
+        const sendResult = await provider.send({
+          to: contact.email, 
+          from: providerConfig.fromEmail, 
+          fromName: providerConfig.fromName,
+          subject: renderedSubject, 
+          html: trackedHtml, 
+          text: textBody, 
+          replyTo: providerConfig.fromEmail, 
+          unsubscribeUrl, 
+          contactId: contact.id
         });
+        logger.info(`[Provider] Resultado do envio: ${sendResult.success ? 'Sucesso' : 'Falha'}`);
+        return sendResult;
       });
 
       if (result.success) {
