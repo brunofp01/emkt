@@ -93,12 +93,13 @@ export function createMailrelayProvider(
           } as SendEmailResult & { accountBlocked?: boolean };
         }
 
-        const data = await response.json() as { status?: string; id?: number; message_id?: string };
+        const data = await response.json();
         
-        // O Mailrelay retorna um ID numérico ou message_id
-        const messageId = data.message_id || (data.id ? `mailrelay-${data.id}` : `mailrelay-${Date.now()}`);
+        // Mailrelay v1 send_emails returns an array: [{"id": 123, "email": "...", ...}]
+        const result = Array.isArray(data) ? data[0] : data;
+        const messageId = result?.message_id || (result?.id ? String(result.id) : null);
         
-        return { success: true, messageId };
+        return { success: true, messageId: messageId || `mr-${Date.now()}` };
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown Mailrelay error";
         return { success: false, error: message };
