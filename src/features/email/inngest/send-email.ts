@@ -36,7 +36,7 @@ export const sendEmail = inngest.createFunction(
       limit: 5,
       key: "event.data.providerId || 'global-send'"
     },
-    triggers: [{ event: "email/send" }],
+    triggers: [{ event: "email/send-v10" }],
   },
   async ({ event, step }) => {
     const { contactId, campaignContactId, subject, htmlBody, textBody } = event.data as {

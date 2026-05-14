@@ -9,7 +9,7 @@ import { supabaseAdmin } from "@/shared/lib/supabase";
  */
 export const cronProcessQueue = inngest.createFunction(
   { 
-    id: "cron-process-queue", 
+    id: "cron-process-queue-v3", 
     name: "Cron — Process Email Queue",
     triggers: [
       { cron: "* * * * *" },
@@ -46,7 +46,7 @@ export const cronProcessQueue = inngest.createFunction(
       .map(cc => {
         const step = stepMap.get(cc.currentStepId)!;
         return {
-          name: "email/send" as const,
+          name: "email/send-v10" as const,
           data: {
             contactId: cc.contactId,
             campaignContactId: cc.id,
