@@ -48,7 +48,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         icon: Users,
         gradient: "from-indigo-500 to-blue-600",
         sub: campaignId
-          ? `${stats.totalSent.toLocaleString("pt-BR")} enviados · ${stats.totalQueued.toLocaleString("pt-BR")} na fila`
+          ? `${stats.totalSent.toLocaleString("pt-BR")} enviados · ${stats.queueSnapshot.sending.toLocaleString("pt-BR")} enviando · ${stats.totalQueued.toLocaleString("pt-BR")} na fila`
           : `${stats.totalActive.toLocaleString("pt-BR")} ativos · ${stats.totalUnsubscribed} cancelados`,
         ...rateIndicator(campaignId ? pctHelper(stats.totalSent, stats.totalContacts) : stats.totalActive / Math.max(stats.totalContacts, 1) * 100, 90, 70),
       },
@@ -57,7 +57,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         value: stats.totalSent.toLocaleString("pt-BR"),
         icon: Mail,
         gradient: "from-blue-500 to-cyan-600",
-        sub: `${stats.totalQueued.toLocaleString("pt-BR")} na fila`,
+        sub: `${stats.queueSnapshot.sending.toLocaleString("pt-BR")} enviando · ${stats.totalQueued.toLocaleString("pt-BR")} na fila`,
         ...rateIndicator(stats.deliveryRate, 95, 85),
       },
       {
