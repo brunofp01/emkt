@@ -72,7 +72,8 @@ export async function selectProviderForSend(): Promise<{
     }
 
     const lastReset = new Date(config.lastResetAt);
-    const isNewDay = now.toDateString() !== lastReset.toDateString();
+    const getDay = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const isNewDay = getDay(now) !== getDay(lastReset);
     
     let currentSent = config.sentToday || 0;
     if (isNewDay) {
@@ -130,7 +131,8 @@ export async function canProviderSendToday(provider: string): Promise<boolean> {
 
   const now = new Date();
   const lastReset = new Date(config.lastResetAt);
-  const isNewDay = now.toDateString() !== lastReset.toDateString();
+  const getDay = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const isNewDay = getDay(now) !== getDay(lastReset);
 
   if (isNewDay) {
     await supabaseAdmin

@@ -169,7 +169,8 @@ export const sendEmail = inngest.createFunction(
 
         const now = new Date();
         const lastReset = new Date(providerConfig.lastResetAt);
-        const isNewDay = now.toDateString() !== lastReset.toDateString();
+        const getDay = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const isNewDay = getDay(now) !== getDay(lastReset);
 
         if (isNewDay) {
           await supabaseAdmin.from('ProviderConfig').update({ sentToday: 0, lastResetAt: now.toISOString(), updatedAt: now.toISOString() }).eq('provider', providerId);
