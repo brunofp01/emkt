@@ -22,11 +22,11 @@ export const ACCOUNT_TIERS = {
     label: "Nova",
     description: "Em warmup — limites conservadores",
     /** Limites por semana desde a criação: [semana1, semana2, ...] */
-    weeklyLimits: [20, 35, 50, 75],
+    weeklyLimits: [100, 200, 300, 500],
     /** Delay mínimo entre emails (segundos) */
-    minDelaySec: 60,
+    minDelaySec: 30,
     /** Delay máximo entre emails (segundos) */
-    maxDelaySec: 120,
+    maxDelaySec: 60,
     /** Semanas necessárias para promover ao próximo tier */
     weeksToPromote: 2,
     /** Taxa máxima de bounce antes de desativar (%) */
@@ -35,9 +35,9 @@ export const ACCOUNT_TIERS = {
   AQUECIDA: {
     label: "Aquecida",
     description: "Intermediária — volume moderado",
-    weeklyLimits: [100, 150, 200, 300],
-    minDelaySec: 30,
-    maxDelaySec: 90,
+    weeklyLimits: [1000, 1500, 2000, 3000],
+    minDelaySec: 15,
+    maxDelaySec: 45,
     weeksToPromote: 4,
     maxBounceRate: 8,
   },
